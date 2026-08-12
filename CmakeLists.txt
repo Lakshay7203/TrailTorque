@@ -12,3 +12,13 @@ add_executable(TrailTorque
 )
 
 target_link_libraries(TrailTorque PRIVATE SDL3::SDL3)
+
+if(WIN32)
+    add_custom_command(
+        TARGET TrailTorque POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy
+            $<TARGET_FILE:SDL3::SDL3-shared>
+            $<TARGET_FILE_DIR:TrailTorque>
+        VERBATIM
+    )
+endif()
