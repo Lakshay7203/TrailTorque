@@ -5,6 +5,10 @@ project(TrailTorque LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_subdirectory(ThirdParty/SDL EXCLUDE_FROM_ALL)
+
 add_executable(TrailTorque
     source/main.cpp
 )
+
+target_link_libraries(TrailTorque PRIVATE SDL3::SDL3)
