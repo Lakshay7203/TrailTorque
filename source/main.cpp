@@ -125,6 +125,11 @@ int main(int argc, char* argv[])
 			player.x += amount;
 		}
 
+        if(keyboardState[SDL_SCANCODE_R])
+		{
+            player.x = 300;
+			player.y = 300;
+		}
         // -------------------------
         // RENDERING
         // -------------------------
