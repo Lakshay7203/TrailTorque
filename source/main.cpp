@@ -19,6 +19,11 @@ constexpr float CHASSIS_HEIGHT = 0.5f;
 
 constexpr float WHEEL_RADIUS = 0.4f;
 
+constexpr float CAMERA_TARGET_X = 400.0f;
+
+constexpr float GROUND_HALF_WIDTH = 100.0f;
+constexpr float GROUND_HEIGHT = 2.0f;
+
 
 // ---------------------------------------------------------
 // INPUT
@@ -97,6 +102,73 @@ void DrawFilledCircle(
     }
 }
 
+void DrawRotatedChassis(
+    SDL_Renderer* renderer,
+    b2BodyId chassisBodyId,
+    float cameraX)
+{
+    // Get the chassis position + rotation from Box2D.
+    b2Transform transform =
+        b2Body_GetTransform(chassisBodyId);
+
+    // Chassis corners in LOCAL space.
+    b2Vec2 localCorners[4] =
+    {
+        { -CHASSIS_WIDTH / 2.0f, -CHASSIS_HEIGHT / 2.0f },
+        {  CHASSIS_WIDTH / 2.0f, -CHASSIS_HEIGHT / 2.0f },
+        {  CHASSIS_WIDTH / 2.0f,  CHASSIS_HEIGHT / 2.0f },
+        { -CHASSIS_WIDTH / 2.0f,  CHASSIS_HEIGHT / 2.0f }
+    };
+
+    SDL_Vertex vertices[4]{};
+
+    const SDL_FColor green =
+    {
+        0.0f,
+        180.0f / 255.0f,
+        0.0f,
+        1.0f
+    };
+
+    for (int i = 0; i < 4; ++i)
+    {
+        // Rotate + move each local corner using Box2D.
+        b2Vec2 worldPoint =
+            b2TransformPoint(
+                transform,
+                localCorners[i]
+            );
+
+        // Convert Box2D world position to SDL screen position.
+        vertices[i].position.x =
+            CAMERA_TARGET_X +
+            (worldPoint.x - cameraX) *
+            PIXELS_PER_METER;
+
+        vertices[i].position.y =
+            SCREEN_CENTER_Y -
+            worldPoint.y *
+            PIXELS_PER_METER;
+
+        vertices[i].color = green;
+    }
+
+    // Two triangles make one rectangle.
+    const int indices[6] =
+    {
+        0, 1, 2,
+        0, 2, 3
+    };
+
+    SDL_RenderGeometry(
+        renderer,
+        nullptr,
+        vertices,
+        4,
+        indices,
+        6
+    );
+}
 
 // ---------------------------------------------------------
 // RENDER
@@ -104,10 +176,14 @@ void DrawFilledCircle(
 
 void Render(
     SDL_Renderer* renderer,
-    const SDL_FRect& chassisRect,
+    b2BodyId chassisBodyId,
+    float cameraX,
     const SDL_FRect& groundRect,
     const SDL_FPoint& rearWheelScreen,
-    const SDL_FPoint& frontWheelScreen)
+    const SDL_FPoint& frontWheelScreen,
+    const SDL_FPoint& hillStart,
+    const SDL_FPoint& hillPeak,
+    const SDL_FPoint& hillEnd)
 {
     // Sky-blue background.
     SDL_SetRenderDrawColor(renderer, 135, 206, 235, 255);
@@ -125,6 +201,27 @@ void Render(
         &groundRect
     );
 
+    // Draw the hill in black.
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+
+    for (int thickness = -3; thickness <= 3; ++thickness)
+    {
+        SDL_RenderLine(
+            renderer,
+            hillStart.x,
+            hillStart.y + thickness,
+            hillPeak.x,
+            hillPeak.y + thickness
+        );
+
+        SDL_RenderLine(
+            renderer,
+            hillPeak.x,
+            hillPeak.y + thickness,
+            hillEnd.x,
+            hillEnd.y + thickness
+        );
+    }
 
     // -----------------------------------------------------
     // CHASSIS
@@ -133,9 +230,10 @@ void Render(
     // Green bike chassis.
     SDL_SetRenderDrawColor(renderer, 0, 180, 0, 255);
 
-    SDL_RenderFillRect(
+    DrawRotatedChassis(
         renderer,
-        &chassisRect
+        chassisBodyId,
+        cameraX
     );
 
 
@@ -274,10 +372,11 @@ int main(int argc, char* argv[])
 
     groundShapeDef.material.friction = 0.9f;
 
-    // b2MakeBox uses HALF width and HALF height.
-    // Full ground size = 40m x 2m.
     b2Polygon groundBox =
-        b2MakeBox(20.0f, 1.0f);
+        b2MakeBox(
+            GROUND_HALF_WIDTH,
+            GROUND_HEIGHT / 2.0f
+        );
 
     b2ShapeId groundShapeId =
         b2CreatePolygonShape(
@@ -291,6 +390,47 @@ int main(int argc, char* argv[])
         1.0f
     );
 
+    // =====================================================
+// FIRST HILL
+// =====================================================
+
+// Static body that holds our hill segments.
+    b2BodyDef hillBodyDef = b2DefaultBodyDef();
+
+    b2BodyId hillBodyId =
+        b2CreateBody(worldId, &hillBodyDef);
+
+
+    // Collision settings for the hill.
+    b2ShapeDef hillShapeDef = b2DefaultShapeDef();
+
+    hillShapeDef.material.friction = 1.0f;
+
+
+    // Uphill section.
+    b2Segment hillUp;
+
+    hillUp.point1 = b2Vec2{ 8.0f, -9.0f };
+    hillUp.point2 = b2Vec2{ 12.0f, -7.5f };
+
+    b2CreateSegmentShape(
+        hillBodyId,
+        &hillShapeDef,
+        &hillUp
+    );
+
+
+    // Downhill section.
+    b2Segment hillDown;
+
+    hillDown.point1 = b2Vec2{ 12.0f, -7.5f };
+    hillDown.point2 = b2Vec2{ 16.0f, -9.0f };
+
+    b2CreateSegmentShape(
+        hillBodyId,
+        &hillShapeDef,
+        &hillDown
+    );
 
     // =====================================================
     // BIKE CHASSIS
@@ -304,10 +444,6 @@ int main(int argc, char* argv[])
 
     chassisBodyDef.position =
         b2Vec2{ 0.0f, -7.0f };
-
-    // Temporary while building the bike.
-    // Later we remove this so the bike can lean/rotate.
-    chassisBodyDef.fixedRotation = true;
 
 
     b2BodyId chassisBodyId =
@@ -568,6 +704,8 @@ int main(int argc, char* argv[])
 
     bool running = true;
 
+    float cameraX = 0.0f;
+
     Uint64 previousTime =
         SDL_GetTicksNS();
 
@@ -636,6 +774,42 @@ int main(int argc, char* argv[])
                 chassisBodyId
             );
 
+        // Camera gradually catches up to the bike.
+        const float cameraFollowSpeed = 3.0f;
+
+        cameraX +=
+            (chassisPosition.x - cameraX) *
+            cameraFollowSpeed *
+            deltaTime;
+        SDL_FPoint hillStart;
+        SDL_FPoint hillPeak;
+        SDL_FPoint hillEnd;
+
+        hillStart.x =
+            CAMERA_TARGET_X +
+            (8.0f - cameraX) * PIXELS_PER_METER;
+
+        hillStart.y =
+            SCREEN_CENTER_Y -
+            (-9.0f * PIXELS_PER_METER);
+
+
+        hillPeak.x =
+            CAMERA_TARGET_X +
+            (12.0f - cameraX) * PIXELS_PER_METER;
+
+        hillPeak.y =
+            SCREEN_CENTER_Y -
+            (-7.5f * PIXELS_PER_METER);
+
+
+        hillEnd.x =
+            CAMERA_TARGET_X +
+            (16.0f - cameraX) * PIXELS_PER_METER;
+
+        hillEnd.y =
+            SCREEN_CENTER_Y -
+            (-9.0f * PIXELS_PER_METER);
 
         b2Vec2 rearWheelPosition =
             b2Body_GetPosition(
@@ -671,8 +845,8 @@ int main(int argc, char* argv[])
 
 
         chassisRect.x =
-            SCREEN_CENTER_X +
-            chassisPosition.x *
+            CAMERA_TARGET_X +
+            (chassisPosition.x - cameraX) *
             PIXELS_PER_METER -
             chassisRect.w / 2.0f;
 
@@ -691,8 +865,8 @@ int main(int argc, char* argv[])
         SDL_FPoint rearWheelScreen;
 
         rearWheelScreen.x =
-            SCREEN_CENTER_X +
-            rearWheelPosition.x *
+            CAMERA_TARGET_X +
+            (rearWheelPosition.x - cameraX) *
             PIXELS_PER_METER;
 
         rearWheelScreen.y =
@@ -708,8 +882,8 @@ int main(int argc, char* argv[])
         SDL_FPoint frontWheelScreen;
 
         frontWheelScreen.x =
-            SCREEN_CENTER_X +
-            frontWheelPosition.x *
+            CAMERA_TARGET_X +
+            (frontWheelPosition.x - cameraX) *
             PIXELS_PER_METER;
 
         frontWheelScreen.y =
@@ -725,15 +899,17 @@ int main(int argc, char* argv[])
         SDL_FRect groundRect;
 
         groundRect.w =
-            40.0f * PIXELS_PER_METER;
+            GROUND_HALF_WIDTH * 2.0f *
+            PIXELS_PER_METER;
 
         groundRect.h =
-            2.0f * PIXELS_PER_METER;
+            GROUND_HEIGHT *
+            PIXELS_PER_METER;
 
 
         groundRect.x =
-            SCREEN_CENTER_X +
-            groundPosition.x *
+            CAMERA_TARGET_X +
+            (groundPosition.x - cameraX) *
             PIXELS_PER_METER -
             groundRect.w / 2.0f;
 
@@ -751,10 +927,14 @@ int main(int argc, char* argv[])
 
         Render(
             renderer,
-            chassisRect,
+            chassisBodyId,
+            cameraX,
             groundRect,
             rearWheelScreen,
-            frontWheelScreen
+            frontWheelScreen,
+            hillStart,
+            hillPeak,
+            hillEnd
         );
     }
 
