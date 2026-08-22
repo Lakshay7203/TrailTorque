@@ -1,6 +1,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <box2d/box2d.h>
+#include <vector>
 
 // ---------------------------------------------------------
 // CONSTANTS
@@ -19,14 +20,30 @@ constexpr float CHASSIS_HEIGHT = 0.5f;
 
 constexpr float WHEEL_RADIUS = 0.4f;
 
+constexpr float CAMERA_TARGET_X = 400.0f;
+
+constexpr float GROUND_HALF_WIDTH = 100.0f;
+constexpr float GROUND_HEIGHT = 2.0f;
 
 // ---------------------------------------------------------
 // INPUT
 // ---------------------------------------------------------
 
+struct InputState
+{
+    bool driveForward = false;
+    bool driveBackward = false;
+
+    bool leanBackward = false;
+    bool leanForward = false;
+
+    bool resetPressed = false;
+};
+
+
 void ProcessInput(
     bool& running,
-    b2JointId rearWheelJointId)
+    InputState& input)
 {
     SDL_Event event;
 
@@ -41,33 +58,20 @@ void ProcessInput(
     const bool* keyboardState =
         SDL_GetKeyboardState(nullptr);
 
+    input.driveForward =
+        keyboardState[SDL_SCANCODE_W];
 
-    // W = drive forward.
-    if (keyboardState[SDL_SCANCODE_W])
-    {
-        b2WheelJoint_SetMotorSpeed(
-            rearWheelJointId,
-            -20.0f
-        );
-    }
+    input.driveBackward =
+        keyboardState[SDL_SCANCODE_S];
 
-    // S = drive backward.
-    else if (keyboardState[SDL_SCANCODE_S])
-    {
-        b2WheelJoint_SetMotorSpeed(
-            rearWheelJointId,
-            20.0f
-        );
-    }
+    input.leanBackward =
+        keyboardState[SDL_SCANCODE_A];
 
-    // No key = stop motor.
-    else
-    {
-        b2WheelJoint_SetMotorSpeed(
-            rearWheelJointId,
-            0.0f
-        );
-    }
+    input.leanForward =
+        keyboardState[SDL_SCANCODE_D];
+
+    input.resetPressed =
+        keyboardState[SDL_SCANCODE_R];
 }
 
 // ---------------------------------------------------------
@@ -97,6 +101,73 @@ void DrawFilledCircle(
     }
 }
 
+void DrawRotatedChassis(
+    SDL_Renderer* renderer,
+    b2BodyId chassisBodyId,
+    float cameraX)
+{
+    // Get the chassis position + rotation from Box2D.
+    b2Transform transform =
+        b2Body_GetTransform(chassisBodyId);
+
+    // Chassis corners in LOCAL space.
+    b2Vec2 localCorners[4] =
+    {
+        { -CHASSIS_WIDTH / 2.0f, -CHASSIS_HEIGHT / 2.0f },
+        {  CHASSIS_WIDTH / 2.0f, -CHASSIS_HEIGHT / 2.0f },
+        {  CHASSIS_WIDTH / 2.0f,  CHASSIS_HEIGHT / 2.0f },
+        { -CHASSIS_WIDTH / 2.0f,  CHASSIS_HEIGHT / 2.0f }
+    };
+
+    SDL_Vertex vertices[4]{};
+
+    const SDL_FColor green =
+    {
+        0.0f,
+        180.0f / 255.0f,
+        0.0f,
+        1.0f
+    };
+
+    for (int i = 0; i < 4; ++i)
+    {
+        // Rotate + move each local corner using Box2D.
+        b2Vec2 worldPoint =
+            b2TransformPoint(
+                transform,
+                localCorners[i]
+            );
+
+        // Convert Box2D world position to SDL screen position.
+        vertices[i].position.x =
+            CAMERA_TARGET_X +
+            (worldPoint.x - cameraX) *
+            PIXELS_PER_METER;
+
+        vertices[i].position.y =
+            SCREEN_CENTER_Y -
+            worldPoint.y *
+            PIXELS_PER_METER;
+
+        vertices[i].color = green;
+    }
+
+    // Two triangles make one rectangle.
+    const int indices[6] =
+    {
+        0, 1, 2,
+        0, 2, 3
+    };
+
+    SDL_RenderGeometry(
+        renderer,
+        nullptr,
+        vertices,
+        4,
+        indices,
+        6
+    );
+}
 
 // ---------------------------------------------------------
 // RENDER
@@ -104,10 +175,16 @@ void DrawFilledCircle(
 
 void Render(
     SDL_Renderer* renderer,
-    const SDL_FRect& chassisRect,
+    b2BodyId chassisBodyId,
+    float cameraX,
     const SDL_FRect& groundRect,
     const SDL_FPoint& rearWheelScreen,
-    const SDL_FPoint& frontWheelScreen)
+    const SDL_FPoint& frontWheelScreen,
+    const SDL_FPoint& hillStart,
+    const SDL_FPoint& hillPeak,
+    const SDL_FPoint& hillEnd,
+    const SDL_FPoint& jumpRampStart,
+    const SDL_FPoint& jumpRampEnd)
 {
     // Sky-blue background.
     SDL_SetRenderDrawColor(renderer, 135, 206, 235, 255);
@@ -125,6 +202,39 @@ void Render(
         &groundRect
     );
 
+    // Draw the hill in black.
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+
+    for (int thickness = -3; thickness <= 3; ++thickness)
+    {
+        SDL_RenderLine(
+            renderer,
+            hillStart.x,
+            hillStart.y + thickness,
+            hillPeak.x,
+            hillPeak.y + thickness
+        );
+
+        SDL_RenderLine(
+            renderer,
+            hillPeak.x,
+            hillPeak.y + thickness,
+            hillEnd.x,
+            hillEnd.y + thickness
+        );
+    }
+
+    // Draw jump ramp.
+    for (int thickness = -3; thickness <= 3; ++thickness)
+    {
+        SDL_RenderLine(
+            renderer,
+            jumpRampStart.x,
+            jumpRampStart.y + thickness,
+            jumpRampEnd.x,
+            jumpRampEnd.y + thickness
+        );
+    }
 
     // -----------------------------------------------------
     // CHASSIS
@@ -133,9 +243,10 @@ void Render(
     // Green bike chassis.
     SDL_SetRenderDrawColor(renderer, 0, 180, 0, 255);
 
-    SDL_RenderFillRect(
+    DrawRotatedChassis(
         renderer,
-        &chassisRect
+        chassisBodyId,
+        cameraX
     );
 
 
@@ -233,7 +344,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-
     // =====================================================
     // BOX2D WORLD
     // =====================================================
@@ -274,10 +384,11 @@ int main(int argc, char* argv[])
 
     groundShapeDef.material.friction = 0.9f;
 
-    // b2MakeBox uses HALF width and HALF height.
-    // Full ground size = 40m x 2m.
     b2Polygon groundBox =
-        b2MakeBox(20.0f, 1.0f);
+        b2MakeBox(
+            GROUND_HALF_WIDTH,
+            GROUND_HEIGHT / 2.0f
+        );
 
     b2ShapeId groundShapeId =
         b2CreatePolygonShape(
@@ -291,6 +402,62 @@ int main(int argc, char* argv[])
         1.0f
     );
 
+    // =====================================================
+// FIRST HILL
+// =====================================================
+
+// Static body that holds our hill segments.
+    b2BodyDef hillBodyDef = b2DefaultBodyDef();
+
+    b2BodyId hillBodyId =
+        b2CreateBody(worldId, &hillBodyDef);
+
+
+    // Collision settings for the hill.
+    b2ShapeDef hillShapeDef = b2DefaultShapeDef();
+
+    hillShapeDef.material.friction = 1.0f;
+
+
+    // Uphill section.
+    b2Segment hillUp;
+
+    hillUp.point1 = b2Vec2{ 8.0f, -9.0f };
+    hillUp.point2 = b2Vec2{ 12.0f, -7.5f };
+
+    b2CreateSegmentShape(
+        hillBodyId,
+        &hillShapeDef,
+        &hillUp
+    );
+
+
+    // Downhill section.
+    b2Segment hillDown;
+
+    hillDown.point1 = b2Vec2{ 12.0f, -7.5f };
+    hillDown.point2 = b2Vec2{ 16.0f, -9.0f };
+
+    b2CreateSegmentShape(
+        hillBodyId,
+        &hillShapeDef,
+        &hillDown
+    );
+
+    // =====================================================
+// FIRST JUMP RAMP
+// =====================================================
+
+    b2Segment jumpRamp;
+
+    jumpRamp.point1 = b2Vec2{ 20.0f, -9.0f };
+    jumpRamp.point2 = b2Vec2{ 24.0f, -6.5f };
+
+    b2CreateSegmentShape(
+        hillBodyId,
+        &hillShapeDef,
+        &jumpRamp
+    );
 
     // =====================================================
     // BIKE CHASSIS
@@ -302,12 +469,10 @@ int main(int argc, char* argv[])
     chassisBodyDef.type =
         b2_dynamicBody;
 
+    chassisBodyDef.angularDamping = 0.5f;
+
     chassisBodyDef.position =
         b2Vec2{ 0.0f, -7.0f };
-
-    // Temporary while building the bike.
-    // Later we remove this so the bike can lean/rotate.
-    chassisBodyDef.fixedRotation = true;
 
 
     b2BodyId chassisBodyId =
@@ -331,11 +496,12 @@ int main(int argc, char* argv[])
         );
 
 
-    b2CreatePolygonShape(
-        chassisBodyId,
-        &chassisShapeDef,
-        &chassisShape
-    );
+    b2ShapeId chassisShapeId =
+        b2CreatePolygonShape(
+            chassisBodyId,
+            &chassisShapeDef,
+            &chassisShape
+        );
 
 
     // =====================================================
@@ -568,8 +734,15 @@ int main(int argc, char* argv[])
 
     bool running = true;
 
+    float cameraX = 0.0f;
+
     Uint64 previousTime =
         SDL_GetTicksNS();
+
+    InputState input;
+
+    bool bikeGrounded = true;
+
 
 
     // =====================================================
@@ -600,11 +773,72 @@ int main(int argc, char* argv[])
 
         ProcessInput(
             running,
-            rearWheelJointId
+            input
         );
 
-        const bool* keyboardState =
-            SDL_GetKeyboardState(nullptr);
+        if (input.resetPressed)
+        {
+            // Reset chassis.
+            b2Body_SetTransform(
+                chassisBodyId,
+                b2Vec2{ 0.0f, -7.0f },
+                b2MakeRot(0.0f)
+            );
+
+            // Reset rear wheel.
+            b2Body_SetTransform(
+                rearWheelBodyId,
+                b2Vec2{ -0.8f, -7.65f },
+                b2MakeRot(0.0f)
+            );
+
+            // Reset front wheel.
+            b2Body_SetTransform(
+                frontWheelBodyId,
+                b2Vec2{ 0.8f, -7.65f },
+                b2MakeRot(0.0f)
+            );
+
+
+            // Remove all movement.
+            b2Body_SetLinearVelocity(
+                chassisBodyId,
+                b2Vec2{ 0.0f, 0.0f }
+            );
+
+            b2Body_SetLinearVelocity(
+                rearWheelBodyId,
+                b2Vec2{ 0.0f, 0.0f }
+            );
+
+            b2Body_SetLinearVelocity(
+                frontWheelBodyId,
+                b2Vec2{ 0.0f, 0.0f }
+            );
+
+
+            // Remove all spinning.
+            b2Body_SetAngularVelocity(
+                chassisBodyId,
+                0.0f
+            );
+
+            b2Body_SetAngularVelocity(
+                rearWheelBodyId,
+                0.0f
+            );
+
+            b2Body_SetAngularVelocity(
+                frontWheelBodyId,
+                0.0f
+            );
+
+
+            // Put camera back at the starting area.
+            cameraX = 0.0f;
+
+            bikeGrounded = true;
+        }
 
 
         // -------------------------------------------------
@@ -615,14 +849,186 @@ int main(int argc, char* argv[])
 
         while (physicsAccumulator >= physicsTimeStep)
         {
+            // ---------------------------------------------
+            // DRIVE
+            // ---------------------------------------------
+
+            if (input.driveForward)
+            {
+                b2WheelJoint_SetMotorSpeed(
+                    rearWheelJointId,
+                    -20.0f
+                );
+            }
+            else if (input.driveBackward)
+            {
+                b2WheelJoint_SetMotorSpeed(
+                    rearWheelJointId,
+                    20.0f
+                );
+            }
+            else
+            {
+                b2WheelJoint_SetMotorSpeed(
+                    rearWheelJointId,
+                    0.0f
+                );
+            }
+
+
+            // ---------------------------------------------
+            // CURRENT ROTATION
+            // ---------------------------------------------
+
+            float angularVelocity =
+                b2Body_GetAngularVelocity(chassisBodyId);
+
+            b2Rot chassisRotation =
+                b2Body_GetRotation(chassisBodyId);
+
+            float chassisAngle =
+                b2Rot_GetAngle(chassisRotation);
+
+
+            // ---------------------------------------------
+         // GROUND / AIR BIKE CONTROL
+         // ---------------------------------------------
+
+            if (bikeGrounded)
+            {
+                // Controlled ground leaning.
+                float targetAngle = 0.0f;
+
+                if (input.leanBackward && !input.leanForward)
+                {
+                    targetAngle = 0.35f;
+                }
+                else if (input.leanForward && !input.leanBackward)
+                {
+                    targetAngle = -0.35f;
+                }
+
+                const float leanStrength = 8.0f;
+                const float leanDamping = 2.0f;
+
+                float angleError =
+                    targetAngle - chassisAngle;
+
+                float correctionTorque =
+                    (angleError * leanStrength)
+                    -
+                    (angularVelocity * leanDamping);
+
+                b2Body_ApplyTorque(
+                    chassisBodyId,
+                    correctionTorque,
+                    true
+                );
+            }
+            else
+            {
+                // Free rotation while airborne.
+                const float airTorque = 20.0f;
+
+                if (input.leanBackward && !input.leanForward)
+                {
+                    b2Body_ApplyTorque(
+                        chassisBodyId,
+                        airTorque,
+                        true
+                    );
+                }
+                else if (input.leanForward && !input.leanBackward)
+                {
+                    b2Body_ApplyTorque(
+                        chassisBodyId,
+                        -airTorque,
+                        true
+                    );
+                }
+            }
+
+
+            // ---------------------------------------------
+            // RUN BOX2D
+            // ---------------------------------------------
+
             b2World_Step(
                 worldId,
                 physicsTimeStep,
                 subStepCount
             );
 
-            physicsAccumulator -=
-                physicsTimeStep;
+            b2ContactData rearContacts[4];
+            b2ContactData frontContacts[4];
+
+            int rearContactCount =
+                b2Shape_GetContactData(
+                    rearWheelShapeId,
+                    rearContacts,
+                    4
+                );
+
+            int frontContactCount =
+                b2Shape_GetContactData(
+                    frontWheelShapeId,
+                    frontContacts,
+                    4
+                );
+
+            bool rearWheelGrounded =
+                rearContactCount > 0;
+
+            bool frontWheelGrounded =
+                frontContactCount > 0;
+
+            bikeGrounded =
+                rearWheelGrounded ||
+                frontWheelGrounded;
+
+            if (bikeGrounded)
+            {
+                SDL_SetWindowTitle(
+                    window,
+                    "TrailTorque - GROUND"
+                );
+            }
+            else
+            {
+                SDL_SetWindowTitle(
+                    window,
+                    "TrailTorque - AIR"
+                );
+            }
+
+            // ---------------------------------------------
+            // LIMIT ROTATION SPEED
+            // ---------------------------------------------
+
+            angularVelocity =
+                b2Body_GetAngularVelocity(chassisBodyId);
+
+            const float maxAngularSpeed =
+                bikeGrounded ? 1.5f : 8.0f;
+
+            if (angularVelocity > maxAngularSpeed)
+            {
+                b2Body_SetAngularVelocity(
+                    chassisBodyId,
+                    maxAngularSpeed
+                );
+            }
+
+            if (angularVelocity < -maxAngularSpeed)
+            {
+                b2Body_SetAngularVelocity(
+                    chassisBodyId,
+                    -maxAngularSpeed
+                );
+            }
+
+
+            physicsAccumulator -= physicsTimeStep;
         }
 
 
@@ -636,6 +1042,42 @@ int main(int argc, char* argv[])
                 chassisBodyId
             );
 
+        // Camera gradually catches up to the bike.
+        const float cameraFollowSpeed = 3.0f;
+
+        cameraX +=
+            (chassisPosition.x - cameraX) *
+            cameraFollowSpeed *
+            deltaTime;
+        SDL_FPoint hillStart;
+        SDL_FPoint hillPeak;
+        SDL_FPoint hillEnd;
+
+        hillStart.x =
+            CAMERA_TARGET_X +
+            (8.0f - cameraX) * PIXELS_PER_METER;
+
+        hillStart.y =
+            SCREEN_CENTER_Y -
+            (-9.0f * PIXELS_PER_METER);
+
+
+        hillPeak.x =
+            CAMERA_TARGET_X +
+            (12.0f - cameraX) * PIXELS_PER_METER;
+
+        hillPeak.y =
+            SCREEN_CENTER_Y -
+            (-7.5f * PIXELS_PER_METER);
+
+
+        hillEnd.x =
+            CAMERA_TARGET_X +
+            (16.0f - cameraX) * PIXELS_PER_METER;
+
+        hillEnd.y =
+            SCREEN_CENTER_Y -
+            (-9.0f * PIXELS_PER_METER);
 
         b2Vec2 rearWheelPosition =
             b2Body_GetPosition(
@@ -654,6 +1096,27 @@ int main(int argc, char* argv[])
                 groundBodyId
             );
 
+        SDL_FPoint jumpRampStart;
+        SDL_FPoint jumpRampEnd;
+
+
+        jumpRampStart.x =
+            CAMERA_TARGET_X +
+            (20.0f - cameraX) * PIXELS_PER_METER;
+
+        jumpRampStart.y =
+            SCREEN_CENTER_Y -
+            (-9.0f * PIXELS_PER_METER);
+
+
+        jumpRampEnd.x =
+            CAMERA_TARGET_X +
+            (24.0f - cameraX) * PIXELS_PER_METER;
+
+        jumpRampEnd.y =
+            SCREEN_CENTER_Y -
+            (-6.5f * PIXELS_PER_METER);
+
 
         // =================================================
         // CHASSIS -> SDL
@@ -671,8 +1134,8 @@ int main(int argc, char* argv[])
 
 
         chassisRect.x =
-            SCREEN_CENTER_X +
-            chassisPosition.x *
+            CAMERA_TARGET_X +
+            (chassisPosition.x - cameraX) *
             PIXELS_PER_METER -
             chassisRect.w / 2.0f;
 
@@ -691,8 +1154,8 @@ int main(int argc, char* argv[])
         SDL_FPoint rearWheelScreen;
 
         rearWheelScreen.x =
-            SCREEN_CENTER_X +
-            rearWheelPosition.x *
+            CAMERA_TARGET_X +
+            (rearWheelPosition.x - cameraX) *
             PIXELS_PER_METER;
 
         rearWheelScreen.y =
@@ -708,8 +1171,8 @@ int main(int argc, char* argv[])
         SDL_FPoint frontWheelScreen;
 
         frontWheelScreen.x =
-            SCREEN_CENTER_X +
-            frontWheelPosition.x *
+            CAMERA_TARGET_X +
+            (frontWheelPosition.x - cameraX) *
             PIXELS_PER_METER;
 
         frontWheelScreen.y =
@@ -725,15 +1188,17 @@ int main(int argc, char* argv[])
         SDL_FRect groundRect;
 
         groundRect.w =
-            40.0f * PIXELS_PER_METER;
+            GROUND_HALF_WIDTH * 2.0f *
+            PIXELS_PER_METER;
 
         groundRect.h =
-            2.0f * PIXELS_PER_METER;
+            GROUND_HEIGHT *
+            PIXELS_PER_METER;
 
 
         groundRect.x =
-            SCREEN_CENTER_X +
-            groundPosition.x *
+            CAMERA_TARGET_X +
+            (groundPosition.x - cameraX) *
             PIXELS_PER_METER -
             groundRect.w / 2.0f;
 
@@ -751,10 +1216,16 @@ int main(int argc, char* argv[])
 
         Render(
             renderer,
-            chassisRect,
+            chassisBodyId,
+            cameraX,
             groundRect,
             rearWheelScreen,
-            frontWheelScreen
+            frontWheelScreen,
+            hillStart,
+            hillPeak,
+            hillEnd,
+            jumpRampStart,
+            jumpRampEnd
         );
     }
 
