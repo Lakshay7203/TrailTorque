@@ -285,18 +285,151 @@ void DrawFinishLine(
     }
 }
 
+void DrawText(
+    SDL_Renderer* renderer,
+    TTF_Font* font,
+    const char* text,
+    float x,
+    float y,
+    SDL_Color color)
+{
+    SDL_Surface* textSurface =
+        TTF_RenderText_Blended(
+            font,
+            text,
+            0,
+            color
+        );
+
+    if (!textSurface)
+    {
+        SDL_Log(
+            "Text surface creation failed: %s",
+            SDL_GetError()
+        );
+
+        return;
+    }
+
+
+    SDL_Texture* textTexture =
+        SDL_CreateTextureFromSurface(
+            renderer,
+            textSurface
+        );
+
+    if (!textTexture)
+    {
+        SDL_Log(
+            "Text texture creation failed: %s",
+            SDL_GetError()
+        );
+
+        SDL_DestroySurface(textSurface);
+        return;
+    }
+
+
+    SDL_FRect destination =
+    {
+        x,
+        y,
+        static_cast<float>(textSurface->w),
+        static_cast<float>(textSurface->h)
+    };
+
+
+    SDL_RenderTexture(
+        renderer,
+        textTexture,
+        nullptr,
+        &destination
+    );
+
+
+    SDL_DestroyTexture(textTexture);
+    SDL_DestroySurface(textSurface);
+}
+
+void DrawUI(
+    SDL_Renderer* renderer,
+    TTF_Font* font,
+    bool levelComplete)
+{
+    SDL_Color white =
+    {
+        255,
+        255,
+        255,
+        255
+    };
+
+
+    if (!levelComplete)
+    {
+        DrawText(
+            renderer,
+            font,
+            "W/S - Drive",
+            25.0f,
+            25.0f,
+            white
+        );
+
+        DrawText(
+            renderer,
+            font,
+            "A/D - Lean",
+            25.0f,
+            55.0f,
+            white
+        );
+
+        DrawText(
+            renderer,
+            font,
+            "R - Reset",
+            25.0f,
+            85.0f,
+            white
+        );
+    }
+    else
+    {
+        DrawText(
+            renderer,
+            font,
+            "LEVEL COMPLETE!",
+            SCREEN_WIDTH / 2.0f - 110.0f,
+            100.0f,
+            white
+        );
+
+        DrawText(
+            renderer,
+            font,
+            "Press R to restart",
+            SCREEN_WIDTH / 2.0f - 105.0f,
+            140.0f,
+            white
+        );
+    }
+}
+
 // ---------------------------------------------------------
 // RENDER
 // ---------------------------------------------------------
 
 void Render(
     SDL_Renderer* renderer,
+    TTF_Font* font,
     b2BodyId chassisBodyId,
     float cameraX,
     const SDL_FRect& groundRect,
     const SDL_FPoint& rearWheelScreen,
     const SDL_FPoint& frontWheelScreen,
-    const std::vector<TerrainSegment>& terrainSegments)
+    const std::vector<TerrainSegment>& terrainSegments,
+    bool levelComplete)
 {
     // =====================================================
     // SKY
@@ -701,6 +834,15 @@ void Render(
         wheelRadiusPixels
     );
 
+    // =====================================================
+// UI
+// =====================================================
+
+    DrawUI(
+        renderer,
+        font,
+        levelComplete
+    );
 
     // =====================================================
     // PRESENT
@@ -727,6 +869,17 @@ int main(int argc, char* argv[])
             SDL_GetError()
         );
 
+        return 1;
+    }
+
+    if (!TTF_Init())
+    {
+        SDL_Log(
+            "SDL_ttf initialization failed: %s",
+            SDL_GetError()
+        );
+
+        SDL_Quit();
         return 1;
     }
 
@@ -774,6 +927,27 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    TTF_Font* font =
+        TTF_OpenFont(
+            "C:/Windows/Fonts/arial.ttf",
+            24.0f
+        );
+
+    if (!font)
+    {
+        SDL_Log(
+            "Font loading failed: %s",
+            SDL_GetError()
+        );
+
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+
+        TTF_Quit();
+        SDL_Quit();
+
+        return 1;
+    }
     // =====================================================
     // BOX2D WORLD
     // =====================================================
@@ -1313,6 +1487,8 @@ int main(int argc, char* argv[])
             cameraX = 0.0f;
 
             bikeGrounded = true;
+
+            levelComplete = false;
         }
 
 
@@ -1627,12 +1803,14 @@ int main(int argc, char* argv[])
 
         Render(
             renderer,
+            font,
             chassisBodyId,
             cameraX,
             groundRect,
             rearWheelScreen,
             frontWheelScreen,
-            terrainSegments
+            terrainSegments,
+            levelComplete
         );
     }
 
@@ -1645,7 +1823,9 @@ int main(int argc, char* argv[])
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    TTF_CloseFont(font);
 
+    TTF_Quit();
     SDL_Quit();
 
     return 0;
