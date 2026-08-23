@@ -40,6 +40,11 @@ struct InputState
     bool resetPressed = false;
 };
 
+struct TerrainSegment
+{
+    b2Vec2 start;
+    b2Vec2 end;
+};
 
 void ProcessInput(
     bool& running,
@@ -180,68 +185,362 @@ void Render(
     const SDL_FRect& groundRect,
     const SDL_FPoint& rearWheelScreen,
     const SDL_FPoint& frontWheelScreen,
-    const SDL_FPoint& hillStart,
-    const SDL_FPoint& hillPeak,
-    const SDL_FPoint& hillEnd,
-    const SDL_FPoint& jumpRampStart,
-    const SDL_FPoint& jumpRampEnd)
+    const std::vector<TerrainSegment>& terrainSegments)
 {
-    // Sky-blue background.
-    SDL_SetRenderDrawColor(renderer, 135, 206, 235, 255);
+    // =====================================================
+    // SKY
+    // =====================================================
+
+    SDL_SetRenderDrawColor(
+        renderer,
+        135,
+        206,
+        235,
+        255
+    );
+
     SDL_RenderClear(renderer);
 
 
-    // -----------------------------------------------------
-    // GROUND
-    // -----------------------------------------------------
+    // =====================================================
+// DISTANT MOUNTAINS - FAR LAYER
+// =====================================================
 
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+// Moves very slowly compared with the camera.
+    const float farMountainShift =
+        -cameraX * 1.5f;
+
+    SDL_Vertex farMountains[12]{};
+
+    const SDL_FColor farMountainColor =
+    {
+        0.55f,
+        0.68f,
+        0.58f,
+        1.0f
+    };
+
+
+    // Mountain 1.
+    farMountains[0].position =
+        SDL_FPoint{ -100.0f + farMountainShift, 530.0f };
+
+    farMountains[1].position =
+        SDL_FPoint{ 120.0f + farMountainShift, 350.0f };
+
+    farMountains[2].position =
+        SDL_FPoint{ 340.0f + farMountainShift, 530.0f };
+
+
+    // Mountain 2.
+    farMountains[3].position =
+        SDL_FPoint{ 220.0f + farMountainShift, 530.0f };
+
+    farMountains[4].position =
+        SDL_FPoint{ 500.0f + farMountainShift, 320.0f };
+
+    farMountains[5].position =
+        SDL_FPoint{ 780.0f + farMountainShift, 530.0f };
+
+
+    // Mountain 3.
+    farMountains[6].position =
+        SDL_FPoint{ 650.0f + farMountainShift, 530.0f };
+
+    farMountains[7].position =
+        SDL_FPoint{ 900.0f + farMountainShift, 370.0f };
+
+    farMountains[8].position =
+        SDL_FPoint{ 1150.0f + farMountainShift, 530.0f };
+
+
+    // Mountain 4.
+    farMountains[9].position =
+        SDL_FPoint{ 1050.0f + farMountainShift, 530.0f };
+
+    farMountains[10].position =
+        SDL_FPoint{ 1300.0f + farMountainShift, 340.0f };
+
+    farMountains[11].position =
+        SDL_FPoint{ 1550.0f + farMountainShift, 530.0f };
+
+
+    for (int i = 0; i < 12; ++i)
+    {
+        farMountains[i].color =
+            farMountainColor;
+    }
+
+
+    const int farMountainIndices[12] =
+    {
+        0, 1, 2,
+        3, 4, 5,
+        6, 7, 8,
+        9, 10, 11
+    };
+
+
+    SDL_RenderGeometry(
+        renderer,
+        nullptr,
+        farMountains,
+        12,
+        farMountainIndices,
+        12
+    );
+
+
+    // =====================================================
+    // DISTANT MOUNTAINS - NEAR LAYER
+    // =====================================================
+
+    // Slightly faster movement = looks closer.
+    const float nearMountainShift =
+        -cameraX * 3.0f;
+
+    SDL_Vertex nearMountains[9]{};
+
+    const SDL_FColor nearMountainColor =
+    {
+        0.38f,
+        0.55f,
+        0.40f,
+        1.0f
+    };
+
+
+    // Mountain 1.
+    nearMountains[0].position =
+        SDL_FPoint{ -150.0f + nearMountainShift, 560.0f };
+
+    nearMountains[1].position =
+        SDL_FPoint{ 100.0f + nearMountainShift, 410.0f };
+
+    nearMountains[2].position =
+        SDL_FPoint{ 350.0f + nearMountainShift, 560.0f };
+
+
+    // Mountain 2.
+    nearMountains[3].position =
+        SDL_FPoint{ 300.0f + nearMountainShift, 560.0f };
+
+    nearMountains[4].position =
+        SDL_FPoint{ 620.0f + nearMountainShift, 390.0f };
+
+    nearMountains[5].position =
+        SDL_FPoint{ 940.0f + nearMountainShift, 560.0f };
+
+
+    // Mountain 3.
+    nearMountains[6].position =
+        SDL_FPoint{ 850.0f + nearMountainShift, 560.0f };
+
+    nearMountains[7].position =
+        SDL_FPoint{ 1120.0f + nearMountainShift, 420.0f };
+
+    nearMountains[8].position =
+        SDL_FPoint{ 1390.0f + nearMountainShift, 560.0f };
+
+
+    for (int i = 0; i < 9; ++i)
+    {
+        nearMountains[i].color =
+            nearMountainColor;
+    }
+
+
+    const int nearMountainIndices[9] =
+    {
+        0, 1, 2,
+        3, 4, 5,
+        6, 7, 8
+    };
+
+
+    SDL_RenderGeometry(
+        renderer,
+        nullptr,
+        nearMountains,
+        9,
+        nearMountainIndices,
+        9
+    );
+
+
+    // =====================================================
+    // BASE DIRT GROUND
+    // =====================================================
+
+    SDL_SetRenderDrawColor(
+        renderer,
+        120,
+        75,
+        35,
+        255
+    );
 
     SDL_RenderFillRect(
         renderer,
         &groundRect
     );
 
-    // Draw the hill in black.
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
-    for (int thickness = -3; thickness <= 3; ++thickness)
+    // =====================================================
+    // TERRAIN HILLS
+    // =====================================================
+
+    for (const TerrainSegment& terrainSegment : terrainSegments)
+    {
+        SDL_FPoint startScreen;
+        SDL_FPoint endScreen;
+
+
+        // Box2D world -> SDL screen.
+        startScreen.x =
+            CAMERA_TARGET_X +
+            (terrainSegment.start.x - cameraX) *
+            PIXELS_PER_METER;
+
+        startScreen.y =
+            SCREEN_CENTER_Y -
+            terrainSegment.start.y *
+            PIXELS_PER_METER;
+
+
+        endScreen.x =
+            CAMERA_TARGET_X +
+            (terrainSegment.end.x - cameraX) *
+            PIXELS_PER_METER;
+
+        endScreen.y =
+            SCREEN_CENTER_Y -
+            terrainSegment.end.y *
+            PIXELS_PER_METER;
+
+
+        // -------------------------------------------------
+        // FILL DIRT UNDER THE HILL
+        // -------------------------------------------------
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            120,
+            75,
+            35,
+            255
+        );
+
+
+        float differenceX =
+            endScreen.x - startScreen.x;
+
+        if (differenceX != 0.0f)
+        {
+            int startX =
+                static_cast<int>(startScreen.x);
+
+            int endX =
+                static_cast<int>(endScreen.x);
+
+
+            if (startX > endX)
+            {
+                int temporary = startX;
+                startX = endX;
+                endX = temporary;
+            }
+
+
+            for (int x = startX; x <= endX; ++x)
+            {
+                float percentage =
+                    (static_cast<float>(x) - startScreen.x)
+                    /
+                    differenceX;
+
+                float surfaceY =
+                    startScreen.y +
+                    (endScreen.y - startScreen.y) *
+                    percentage;
+
+
+                SDL_RenderLine(
+                    renderer,
+                    static_cast<float>(x),
+                    surfaceY,
+                    static_cast<float>(x),
+                    SCREEN_HEIGHT
+                );
+            }
+        }
+
+
+        // -------------------------------------------------
+        // GRASS SURFACE
+        // -------------------------------------------------
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            60,
+            160,
+            70,
+            255
+        );
+
+
+        for (int thickness = -2;
+            thickness <= 2;
+            ++thickness)
+        {
+            SDL_RenderLine(
+                renderer,
+                startScreen.x,
+                startScreen.y + thickness,
+                endScreen.x,
+                endScreen.y + thickness
+            );
+        }
+    }
+
+
+    // =====================================================
+    // FLAT GROUND GRASS
+    // =====================================================
+
+    SDL_SetRenderDrawColor(
+        renderer,
+        60,
+        160,
+        70,
+        255
+    );
+
+    for (int thickness = 0;
+        thickness < 5;
+        ++thickness)
     {
         SDL_RenderLine(
             renderer,
-            hillStart.x,
-            hillStart.y + thickness,
-            hillPeak.x,
-            hillPeak.y + thickness
-        );
-
-        SDL_RenderLine(
-            renderer,
-            hillPeak.x,
-            hillPeak.y + thickness,
-            hillEnd.x,
-            hillEnd.y + thickness
+            groundRect.x,
+            groundRect.y + thickness,
+            groundRect.x + groundRect.w,
+            groundRect.y + thickness
         );
     }
 
-    // Draw jump ramp.
-    for (int thickness = -3; thickness <= 3; ++thickness)
-    {
-        SDL_RenderLine(
-            renderer,
-            jumpRampStart.x,
-            jumpRampStart.y + thickness,
-            jumpRampEnd.x,
-            jumpRampEnd.y + thickness
-        );
-    }
 
-    // -----------------------------------------------------
+    // =====================================================
     // CHASSIS
-    // -----------------------------------------------------
+    // =====================================================
 
-    // Green bike chassis.
-    SDL_SetRenderDrawColor(renderer, 0, 180, 0, 255);
+    SDL_SetRenderDrawColor(
+        renderer,
+        0,
+        180,
+        0,
+        255
+    );
 
     DrawRotatedChassis(
         renderer,
@@ -250,15 +549,23 @@ void Render(
     );
 
 
-    // -----------------------------------------------------
+    // =====================================================
     // WHEELS
-    // -----------------------------------------------------
+    // =====================================================
 
-    // Black wheels.
-    SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
+    SDL_SetRenderDrawColor(
+        renderer,
+        30,
+        30,
+        30,
+        255
+    );
+
 
     const float wheelRadiusPixels =
-        WHEEL_RADIUS * PIXELS_PER_METER;
+        WHEEL_RADIUS *
+        PIXELS_PER_METER;
+
 
     DrawFilledCircle(
         renderer,
@@ -266,6 +573,7 @@ void Render(
         rearWheelScreen.y,
         wheelRadiusPixels
     );
+
 
     DrawFilledCircle(
         renderer,
@@ -275,7 +583,10 @@ void Render(
     );
 
 
-    // Show completed frame.
+    // =====================================================
+    // PRESENT
+    // =====================================================
+
     SDL_RenderPresent(renderer);
 }
 
@@ -419,45 +730,90 @@ int main(int argc, char* argv[])
     hillShapeDef.material.friction = 1.0f;
 
 
-    // Uphill section.
-    b2Segment hillUp;
-
-    hillUp.point1 = b2Vec2{ 8.0f, -9.0f };
-    hillUp.point2 = b2Vec2{ 12.0f, -7.5f };
-
-    b2CreateSegmentShape(
-        hillBodyId,
-        &hillShapeDef,
-        &hillUp
-    );
-
-
-    // Downhill section.
-    b2Segment hillDown;
-
-    hillDown.point1 = b2Vec2{ 12.0f, -7.5f };
-    hillDown.point2 = b2Vec2{ 16.0f, -9.0f };
-
-    b2CreateSegmentShape(
-        hillBodyId,
-        &hillShapeDef,
-        &hillDown
-    );
-
     // =====================================================
-// FIRST JUMP RAMP
+// COURSE TERRAIN
 // =====================================================
 
-    b2Segment jumpRamp;
+    std::vector<TerrainSegment> terrainSegments =
+    {
+        // Small warm-up hill.
+        {
+            b2Vec2{ 6.0f, -9.0f },
+            b2Vec2{ 10.0f, -7.8f }
+        },
 
-    jumpRamp.point1 = b2Vec2{ 20.0f, -9.0f };
-    jumpRamp.point2 = b2Vec2{ 24.0f, -6.5f };
+        {
+            b2Vec2{ 10.0f, -7.8f },
+            b2Vec2{ 14.0f, -9.0f }
+        },
 
-    b2CreateSegmentShape(
-        hillBodyId,
-        &hillShapeDef,
-        &jumpRamp
-    );
+
+        // First jump ramp.
+        {
+            b2Vec2{ 18.0f, -9.0f },
+            b2Vec2{ 22.0f, -6.8f }
+        },
+
+
+        // Landing hill.
+        {
+            b2Vec2{ 27.0f, -9.0f },
+            b2Vec2{ 31.0f, -7.4f }
+        },
+
+        {
+            b2Vec2{ 31.0f, -7.4f },
+            b2Vec2{ 35.0f, -9.0f }
+        },
+
+
+        // Bigger hill.
+        {
+            b2Vec2{ 39.0f, -9.0f },
+            b2Vec2{ 44.0f, -6.5f }
+        },
+
+        {
+            b2Vec2{ 44.0f, -6.5f },
+            b2Vec2{ 49.0f, -9.0f }
+        },
+
+
+        // Final jump.
+        {
+            b2Vec2{ 54.0f, -9.0f },
+            b2Vec2{ 59.0f, -6.2f }
+        },
+
+
+        // Final landing hill.
+        {
+            b2Vec2{ 65.0f, -9.0f },
+            b2Vec2{ 69.0f, -7.5f }
+        },
+
+        {
+            b2Vec2{ 69.0f, -7.5f },
+            b2Vec2{ 74.0f, -9.0f }
+        }
+    };
+
+    for (const TerrainSegment& terrainSegment : terrainSegments)
+    {
+        b2Segment box2dSegment;
+
+        box2dSegment.point1 =
+            terrainSegment.start;
+
+        box2dSegment.point2 =
+            terrainSegment.end;
+
+        b2CreateSegmentShape(
+            hillBodyId,
+            &hillShapeDef,
+            &box2dSegment
+        );
+    }
 
     // =====================================================
     // BIKE CHASSIS
@@ -594,7 +950,6 @@ int main(int argc, char* argv[])
     frontWheelCircle.radius =
         WHEEL_RADIUS;
 
-    rearWheelShapeDef.material.friction = 0.9f;
     frontWheelShapeDef.material.friction = 0.9f;
 
     b2ShapeId frontWheelShapeId =
@@ -1049,35 +1404,7 @@ int main(int argc, char* argv[])
             (chassisPosition.x - cameraX) *
             cameraFollowSpeed *
             deltaTime;
-        SDL_FPoint hillStart;
-        SDL_FPoint hillPeak;
-        SDL_FPoint hillEnd;
-
-        hillStart.x =
-            CAMERA_TARGET_X +
-            (8.0f - cameraX) * PIXELS_PER_METER;
-
-        hillStart.y =
-            SCREEN_CENTER_Y -
-            (-9.0f * PIXELS_PER_METER);
-
-
-        hillPeak.x =
-            CAMERA_TARGET_X +
-            (12.0f - cameraX) * PIXELS_PER_METER;
-
-        hillPeak.y =
-            SCREEN_CENTER_Y -
-            (-7.5f * PIXELS_PER_METER);
-
-
-        hillEnd.x =
-            CAMERA_TARGET_X +
-            (16.0f - cameraX) * PIXELS_PER_METER;
-
-        hillEnd.y =
-            SCREEN_CENTER_Y -
-            (-9.0f * PIXELS_PER_METER);
+     
 
         b2Vec2 rearWheelPosition =
             b2Body_GetPosition(
@@ -1095,56 +1422,6 @@ int main(int argc, char* argv[])
             b2Body_GetPosition(
                 groundBodyId
             );
-
-        SDL_FPoint jumpRampStart;
-        SDL_FPoint jumpRampEnd;
-
-
-        jumpRampStart.x =
-            CAMERA_TARGET_X +
-            (20.0f - cameraX) * PIXELS_PER_METER;
-
-        jumpRampStart.y =
-            SCREEN_CENTER_Y -
-            (-9.0f * PIXELS_PER_METER);
-
-
-        jumpRampEnd.x =
-            CAMERA_TARGET_X +
-            (24.0f - cameraX) * PIXELS_PER_METER;
-
-        jumpRampEnd.y =
-            SCREEN_CENTER_Y -
-            (-6.5f * PIXELS_PER_METER);
-
-
-        // =================================================
-        // CHASSIS -> SDL
-        // =================================================
-
-        SDL_FRect chassisRect;
-
-        chassisRect.w =
-            CHASSIS_WIDTH *
-            PIXELS_PER_METER;
-
-        chassisRect.h =
-            CHASSIS_HEIGHT *
-            PIXELS_PER_METER;
-
-
-        chassisRect.x =
-            CAMERA_TARGET_X +
-            (chassisPosition.x - cameraX) *
-            PIXELS_PER_METER -
-            chassisRect.w / 2.0f;
-
-
-        chassisRect.y =
-            SCREEN_CENTER_Y -
-            chassisPosition.y *
-            PIXELS_PER_METER -
-            chassisRect.h / 2.0f;
 
 
         // =================================================
@@ -1221,11 +1498,7 @@ int main(int argc, char* argv[])
             groundRect,
             rearWheelScreen,
             frontWheelScreen,
-            hillStart,
-            hillPeak,
-            hillEnd,
-            jumpRampStart,
-            jumpRampEnd
+            terrainSegments
         );
     }
 
