@@ -25,6 +25,7 @@ constexpr float CAMERA_TARGET_X = 400.0f;
 constexpr float GROUND_HALF_WIDTH = 100.0f;
 constexpr float GROUND_HEIGHT = 2.0f;
 
+constexpr float FINISH_X = 90.0f;
 // ---------------------------------------------------------
 // INPUT
 // ---------------------------------------------------------
@@ -172,6 +173,115 @@ void DrawRotatedChassis(
         indices,
         6
     );
+}
+
+void DrawFinishLine(
+    SDL_Renderer* renderer,
+    float cameraX)
+{
+    const float finishScreenX =
+        CAMERA_TARGET_X +
+        (FINISH_X - cameraX) *
+        PIXELS_PER_METER;
+
+    // Our normal ground surface is y = -9 in Box2D.
+    const float groundScreenY =
+        SCREEN_CENTER_Y -
+        (-9.0f * PIXELS_PER_METER);
+
+
+    // =============================================
+    // FLAG POLE
+    // =============================================
+
+    SDL_SetRenderDrawColor(
+        renderer,
+        40,
+        40,
+        40,
+        255
+    );
+
+    SDL_FRect pole =
+    {
+        finishScreenX,
+        groundScreenY - 170.0f,
+        6.0f,
+        170.0f
+    };
+
+    SDL_RenderFillRect(
+        renderer,
+        &pole
+    );
+
+
+    // =============================================
+    // CHECKERED FLAG
+    // =============================================
+
+    const float flagWidth = 90.0f;
+    const float flagHeight = 60.0f;
+
+    const int columns = 6;
+    const int rows = 4;
+
+    const float cellWidth =
+        flagWidth / columns;
+
+    const float cellHeight =
+        flagHeight / rows;
+
+
+    for (int row = 0; row < rows; ++row)
+    {
+        for (int column = 0;
+            column < columns;
+            ++column)
+        {
+            bool blackSquare =
+                (row + column) % 2 == 0;
+
+            if (blackSquare)
+            {
+                SDL_SetRenderDrawColor(
+                    renderer,
+                    20,
+                    20,
+                    20,
+                    255
+                );
+            }
+            else
+            {
+                SDL_SetRenderDrawColor(
+                    renderer,
+                    245,
+                    245,
+                    245,
+                    255
+                );
+            }
+
+
+            SDL_FRect square =
+            {
+                finishScreenX + 6.0f +
+                    column * cellWidth,
+
+                groundScreenY - 170.0f +
+                    row * cellHeight,
+
+                cellWidth,
+                cellHeight
+            };
+
+            SDL_RenderFillRect(
+                renderer,
+                &square
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------
@@ -529,6 +639,14 @@ void Render(
         );
     }
 
+    // =====================================================
+// FINISH LINE
+// =====================================================
+
+    DrawFinishLine(
+        renderer,
+        cameraX
+    );
 
     // =====================================================
     // CHASSIS
@@ -1098,6 +1216,7 @@ int main(int argc, char* argv[])
 
     bool bikeGrounded = true;
 
+    bool levelComplete = false; 
 
 
     // =====================================================
@@ -1208,14 +1327,14 @@ int main(int argc, char* argv[])
             // DRIVE
             // ---------------------------------------------
 
-            if (input.driveForward)
+            if (!levelComplete && input.driveForward)
             {
                 b2WheelJoint_SetMotorSpeed(
                     rearWheelJointId,
                     -20.0f
                 );
             }
-            else if (input.driveBackward)
+            else if (!levelComplete && input.driveBackward)
             {
                 b2WheelJoint_SetMotorSpeed(
                     rearWheelJointId,
@@ -1341,7 +1460,15 @@ int main(int argc, char* argv[])
                 rearWheelGrounded ||
                 frontWheelGrounded;
 
-            if (bikeGrounded)
+            if (levelComplete)
+            {
+                SDL_SetWindowTitle(
+                    window,
+                    "TrailTorque - LEVEL COMPLETE!"
+                );
+            }
+
+            else if (bikeGrounded)
             {
                 SDL_SetWindowTitle(
                     window,
@@ -1354,6 +1481,7 @@ int main(int argc, char* argv[])
                     window,
                     "TrailTorque - AIR"
                 );
+            
             }
 
             // ---------------------------------------------
@@ -1396,6 +1524,11 @@ int main(int argc, char* argv[])
             b2Body_GetPosition(
                 chassisBodyId
             );
+
+        if (chassisPosition.x >= FINISH_X)
+        {
+            levelComplete = true;
+        }
 
         // Camera gradually catches up to the bike.
         const float cameraFollowSpeed = 3.0f;
