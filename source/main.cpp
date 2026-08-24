@@ -1489,6 +1489,7 @@ int main(int argc, char* argv[])
             bikeGrounded = true;
 
             levelComplete = false;
+
         }
 
 
