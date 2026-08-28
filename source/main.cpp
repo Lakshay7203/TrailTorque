@@ -27,6 +27,7 @@ constexpr float GROUND_HALF_WIDTH = 100.0f;
 constexpr float GROUND_HEIGHT = 2.0f;
 
 constexpr float FINISH_X = 90.0f;
+constexpr float CHECKPOINT_X = 35.0f;
 // ---------------------------------------------------------
 // INPUT
 // ---------------------------------------------------------
@@ -416,6 +417,72 @@ void DrawUI(
     }
 }
 
+void DrawCheckpoint(
+    SDL_Renderer* renderer,
+    float cameraX,
+    bool checkpointReached)
+{
+    // Convert checkpoint world X into screen X.
+    const float checkpointScreenX =
+        CAMERA_TARGET_X +
+        (CHECKPOINT_X - cameraX) *
+        PIXELS_PER_METER;
+
+    // Ground surface is y = -9 in Box2D.
+    const float groundScreenY =
+        SCREEN_CENTER_Y -
+        (-9.0f * PIXELS_PER_METER);
+
+    // Yellow before reaching it, green afterwards.
+    if (checkpointReached)
+    {
+        SDL_SetRenderDrawColor(
+            renderer,
+            50,
+            220,
+            80,
+            255
+        );
+    }
+    else
+    {
+        SDL_SetRenderDrawColor(
+            renderer,
+            255,
+            200,
+            40,
+            255
+        );
+    }
+
+    SDL_FRect pole =
+    {
+        checkpointScreenX,
+        groundScreenY - 110.0f,
+        6.0f,
+        110.0f
+    };
+
+    SDL_RenderFillRect(
+        renderer,
+        &pole
+    );
+
+    // Small flag.
+    SDL_FRect flag =
+    {
+        checkpointScreenX + 6.0f,
+        groundScreenY - 110.0f,
+        55.0f,
+        30.0f
+    };
+
+    SDL_RenderFillRect(
+        renderer,
+        &flag
+    );
+}
+
 // ---------------------------------------------------------
 // RENDER
 // ---------------------------------------------------------
@@ -429,7 +496,8 @@ void Render(
     const SDL_FPoint& rearWheelScreen,
     const SDL_FPoint& frontWheelScreen,
     const std::vector<TerrainSegment>& terrainSegments,
-    bool levelComplete)
+    bool levelComplete,
+    bool checkpointReached)
 {
     // =====================================================
     // SKY
@@ -782,6 +850,12 @@ void Render(
         cameraX
     );
 
+    DrawCheckpoint(
+        renderer,
+        cameraX,
+        checkpointReached
+    );
+
     // =====================================================
     // CHASSIS
     // =====================================================
@@ -1108,6 +1182,7 @@ int main(int argc, char* argv[])
         );
     }
 
+
     // =====================================================
     // BIKE CHASSIS
     // =====================================================
@@ -1393,6 +1468,10 @@ int main(int argc, char* argv[])
 
     bool levelComplete = false; 
 
+    bool checkpointReached = false;
+
+    b2Vec2 respawnPosition =
+        b2Vec2{ 0.0f, -7.0f };
 
     // =====================================================
     // MAIN GAME LOOP
@@ -1425,26 +1504,42 @@ int main(int argc, char* argv[])
             input
         );
 
+
         if (input.resetPressed)
         {
+
+            if (levelComplete)
+            {
+                checkpointReached = false;
+
+                respawnPosition =
+                    b2Vec2{ 0.0f, -7.0f };
+            }
+
             // Reset chassis.
             b2Body_SetTransform(
                 chassisBodyId,
-                b2Vec2{ 0.0f, -7.0f },
+                respawnPosition,
                 b2MakeRot(0.0f)
             );
 
             // Reset rear wheel.
             b2Body_SetTransform(
                 rearWheelBodyId,
-                b2Vec2{ -0.8f, -7.65f },
+                b2Vec2{
+                    respawnPosition.x - 0.8f,
+                    respawnPosition.y - 0.65f
+                },
                 b2MakeRot(0.0f)
             );
 
             // Reset front wheel.
             b2Body_SetTransform(
                 frontWheelBodyId,
-                b2Vec2{ 0.8f, -7.65f },
+                b2Vec2{
+                    respawnPosition.x + 0.8f,
+                    respawnPosition.y - 0.65f
+                },
                 b2MakeRot(0.0f)
             );
 
@@ -1484,7 +1579,7 @@ int main(int argc, char* argv[])
 
 
             // Put camera back at the starting area.
-            cameraX = 0.0f;
+            cameraX = respawnPosition.x;
 
             bikeGrounded = true;
 
@@ -1707,6 +1802,15 @@ int main(int argc, char* argv[])
             levelComplete = true;
         }
 
+        if (!checkpointReached &&
+            chassisPosition.x >= CHECKPOINT_X)
+        {
+            checkpointReached = true;
+
+            respawnPosition =
+                b2Vec2{ CHECKPOINT_X, -7.0f };
+        }
+
         // Camera gradually catches up to the bike.
         const float cameraFollowSpeed = 3.0f;
 
@@ -1810,7 +1914,8 @@ int main(int argc, char* argv[])
             rearWheelScreen,
             frontWheelScreen,
             terrainSegments,
-            levelComplete
+            levelComplete,
+			checkpointReached
         );
     }
 
