@@ -89,4 +89,22 @@ if(WIN32)
 
     endif()
 
+
+    # Box2D.dll
+    if(TARGET box2d::box2d)
+
+        add_custom_command(
+            TARGET TrailTorque
+            POST_BUILD
+
+            COMMAND
+                "${CMAKE_COMMAND}" -E copy_if_different
+                $<TARGET_FILE:box2d::box2d>
+                $<TARGET_FILE_DIR:TrailTorque>
+
+            VERBATIM
+        )
+
+    endif()
+
 endif()
