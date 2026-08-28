@@ -333,8 +333,28 @@ void DrawText(
 void DrawUI(
     SDL_Renderer* renderer,
     TTF_Font* font,
-    bool levelComplete)
+    bool levelComplete,
+    float levelTime,
+    float bestTime,
+    bool newBestTime)
 {
+    char timerText[64];
+
+    int minutes =
+        static_cast<int>(levelTime) / 60;
+
+    float seconds =
+        levelTime -
+        static_cast<float>(minutes * 60);
+
+    SDL_snprintf(
+        timerText,
+        sizeof(timerText),
+        "Time: %02d:%05.2f",
+        minutes,
+        seconds
+    );
+
     SDL_Color white =
     {
         255,
@@ -372,6 +392,15 @@ void DrawUI(
             85.0f,
             white
         );
+
+        DrawText(
+            renderer,
+            font,
+            timerText,
+            SCREEN_WIDTH - 180.0f,
+            25.0f,
+            white
+        );
     }
     else
     {
@@ -380,16 +409,81 @@ void DrawUI(
             font,
             "LEVEL COMPLETE!",
             SCREEN_WIDTH / 2.0f - 110.0f,
-            100.0f,
+            80.0f,
+            white
+        );
+
+        char finishTimeText[64];
+        char bestTimeText[64];
+
+        int finishMinutes =
+            static_cast<int>(levelTime) / 60;
+
+        float finishSeconds =
+            levelTime -
+            static_cast<float>(finishMinutes * 60);
+
+
+        int bestMinutes =
+            static_cast<int>(bestTime) / 60;
+
+        float bestSeconds =
+            bestTime -
+            static_cast<float>(bestMinutes * 60);
+
+
+        SDL_snprintf(
+            finishTimeText,
+            sizeof(finishTimeText),
+            "Finish Time: %02d:%05.2f",
+            finishMinutes,
+            finishSeconds
+        );
+
+        SDL_snprintf(
+            bestTimeText,
+            sizeof(bestTimeText),
+            "Best Time: %02d:%05.2f",
+            bestMinutes,
+            bestSeconds
+        );
+
+        DrawText(
+            renderer,
+            font,
+            finishTimeText,
+            SCREEN_WIDTH / 2.0f - 105.0f,
+            130.0f,
             white
         );
 
         DrawText(
             renderer,
             font,
+            bestTimeText,
+            SCREEN_WIDTH / 2.0f - 105.0f,
+            170.0f,
+            white
+        );
+
+        if (newBestTime)
+        {
+            DrawText(
+                renderer,
+                font,
+                "NEW BEST!",
+                SCREEN_WIDTH / 2.0f - 70.0f,
+                210.0f,
+                white
+            );
+        }
+
+        DrawText(
+            renderer,
+            font,
             "Press R to restart",
             SCREEN_WIDTH / 2.0f - 105.0f,
-            140.0f,
+            260.0f,
             white
         );
     }
@@ -475,7 +569,10 @@ void Render(
     const SDL_FPoint& frontWheelScreen,
     const std::vector<TerrainSegment>& terrainSegments,
     bool levelComplete,
-    bool checkpointReached)
+    bool checkpointReached,
+    float levelTime,
+    float bestTime,
+    bool newBestTime)
 {
     // =====================================================
     // SKY
@@ -890,10 +987,14 @@ void Render(
 // UI
 // =====================================================
 
+
     DrawUI(
         renderer,
         font,
-        levelComplete
+        levelComplete,
+        levelTime,
+		bestTime,
+		newBestTime
     );
 
     // =====================================================
@@ -1056,6 +1157,12 @@ int main(int argc, char* argv[])
 
     bool checkpointReached = false;
 
+    float levelTime = 0.0f;
+
+    // No best time exists yet so -1
+    float bestTime = -1.0f;
+    bool newBestTime = false;
+
     b2Vec2 respawnPosition =
         b2Vec2{ 0.0f, -7.0f };
 
@@ -1080,6 +1187,11 @@ int main(int argc, char* argv[])
 
         previousTime = currentTime;
 
+        if (!levelComplete)
+        {
+            levelTime += deltaTime;
+        }
+
 
         // -------------------------------------------------
         // INPUT
@@ -1100,6 +1212,8 @@ int main(int argc, char* argv[])
 
                 respawnPosition =
                     b2Vec2{ 0.0f, -7.0f };
+
+                levelTime = 0.0f;
             }
 
             ResetBike(
@@ -1187,9 +1301,19 @@ int main(int argc, char* argv[])
                 bike.chassisBodyId
             );
 
-        if (chassisPosition.x >= FINISH_X)
+        if (!levelComplete &&
+            chassisPosition.x >= FINISH_X)
         {
             levelComplete = true;
+
+            newBestTime = false;
+
+            if (bestTime < 0.0f ||
+                levelTime < bestTime)
+            {
+                bestTime = levelTime;
+                newBestTime = true;
+            }
         }
 
         if (!checkpointReached &&
@@ -1305,7 +1429,10 @@ int main(int argc, char* argv[])
             frontWheelScreen,
             terrain.segments,
             levelComplete,
-			checkpointReached
+			checkpointReached,
+            levelTime,
+            bestTime,
+            newBestTime
         );
     }
 
