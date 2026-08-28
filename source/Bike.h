@@ -20,3 +20,5 @@ void ResetBike(
     Bike& bike,
     b2Vec2 respawnPosition
 );
+
+bool IsBikeGrounded(const Bike& bike);

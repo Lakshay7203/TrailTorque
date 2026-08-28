@@ -63,3 +63,32 @@ void ResetBike(
         0.0f
     );
 }
+
+bool IsBikeGrounded(const Bike& bike)
+{
+    b2ContactData rearContacts[4];
+    b2ContactData frontContacts[4];
+
+    int rearContactCount =
+        b2Shape_GetContactData(
+            bike.rearWheelShapeId,
+            rearContacts,
+            4
+        );
+
+    int frontContactCount =
+        b2Shape_GetContactData(
+            bike.frontWheelShapeId,
+            frontContacts,
+            4
+        );
+
+    bool rearWheelGrounded =
+        rearContactCount > 0;
+
+    bool frontWheelGrounded =
+        frontContactCount > 0;
+
+    return rearWheelGrounded ||
+        frontWheelGrounded;
+}
