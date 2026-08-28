@@ -4,6 +4,7 @@
 #include <box2d/box2d.h>
 #include <vector>
 #include "Bike.h"
+#include "Input.h"
 
 // ---------------------------------------------------------
 // CONSTANTS
@@ -17,11 +18,6 @@ constexpr float PIXELS_PER_METER = 30.0f;
 constexpr float SCREEN_CENTER_X = SCREEN_WIDTH / 2.0f;
 constexpr float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0f;
 
-constexpr float CHASSIS_WIDTH = 2.4f;
-constexpr float CHASSIS_HEIGHT = 0.5f;
-
-constexpr float WHEEL_RADIUS = 0.4f;
-
 constexpr float CAMERA_TARGET_X = 400.0f;
 
 constexpr float GROUND_HALF_WIDTH = 100.0f;
@@ -29,20 +25,7 @@ constexpr float GROUND_HEIGHT = 2.0f;
 
 constexpr float FINISH_X = 90.0f;
 constexpr float CHECKPOINT_X = 35.0f;
-// ---------------------------------------------------------
-// INPUT
-// ---------------------------------------------------------
 
-struct InputState
-{
-    bool driveForward = false;
-    bool driveBackward = false;
-
-    bool leanBackward = false;
-    bool leanForward = false;
-
-    bool resetPressed = false;
-};
 
 struct TerrainSegment
 {
@@ -122,10 +105,10 @@ void DrawRotatedChassis(
     // Chassis corners in LOCAL space.
     b2Vec2 localCorners[4] =
     {
-        { -CHASSIS_WIDTH / 2.0f, -CHASSIS_HEIGHT / 2.0f },
-        {  CHASSIS_WIDTH / 2.0f, -CHASSIS_HEIGHT / 2.0f },
-        {  CHASSIS_WIDTH / 2.0f,  CHASSIS_HEIGHT / 2.0f },
-        { -CHASSIS_WIDTH / 2.0f,  CHASSIS_HEIGHT / 2.0f }
+        { -BIKE_CHASSIS_WIDTH / 2.0f, -BIKE_CHASSIS_HEIGHT / 2.0f },
+        {  BIKE_CHASSIS_WIDTH / 2.0f, -BIKE_CHASSIS_HEIGHT / 2.0f },
+        {  BIKE_CHASSIS_WIDTH / 2.0f,  BIKE_CHASSIS_HEIGHT / 2.0f },
+        { -BIKE_CHASSIS_WIDTH / 2.0f,  BIKE_CHASSIS_HEIGHT / 2.0f }
     };
 
     SDL_Vertex vertices[4]{};
@@ -890,7 +873,7 @@ void Render(
 
 
     const float wheelRadiusPixels =
-        WHEEL_RADIUS *
+        BIKE_WHEEL_RADIUS *
         PIXELS_PER_METER;
 
 
@@ -1183,261 +1166,8 @@ int main(int argc, char* argv[])
         );
     }
 
-    Bike bike;
-
-    // =====================================================
-    // BIKE CHASSIS
-    // =====================================================
-
-    b2BodyDef chassisBodyDef =
-        b2DefaultBodyDef();
-
-    chassisBodyDef.type =
-        b2_dynamicBody;
-
-    chassisBodyDef.angularDamping = 0.5f;
-
-    chassisBodyDef.position =
-        b2Vec2{ 0.0f, -7.0f };
-
-
-    bike.chassisBodyId =
-        b2CreateBody(
-            worldId,
-            &chassisBodyDef
-        );
-
-    b2ShapeDef chassisShapeDef =
-        b2DefaultShapeDef();
-
-    chassisShapeDef.density = 1.0f;
-
-
-    // Full chassis = 2.4m x 0.5m.
-    b2Polygon chassisShape =
-        b2MakeBox(
-            CHASSIS_WIDTH / 2.0f,
-            CHASSIS_HEIGHT / 2.0f
-        );
-
-
-    b2ShapeId chassisShapeId =
-        b2CreatePolygonShape(
-            bike.chassisBodyId,
-            &chassisShapeDef,
-            &chassisShape
-        );
-
-
-    // =====================================================
-    // REAR WHEEL
-    // =====================================================
-
-    b2BodyDef rearWheelBodyDef =
-        b2DefaultBodyDef();
-
-    rearWheelBodyDef.type =
-        b2_dynamicBody;
-
-    // Left and below chassis.
-    rearWheelBodyDef.position =
-        b2Vec2{ -0.8f, -7.65f };
-
-
-    bike.rearWheelBodyId =
-        b2CreateBody(
-            worldId,
-            &rearWheelBodyDef
-        );
-
-
-    b2ShapeDef rearWheelShapeDef =
-        b2DefaultShapeDef();
-
-    rearWheelShapeDef.material.friction = 0.9f;
-
-    rearWheelShapeDef.density = 1.0f;
-
-
-    b2Circle rearWheelCircle;
-
-    rearWheelCircle.center =
-        b2Vec2{ 0.0f, 0.0f };
-
-    rearWheelCircle.radius =
-        WHEEL_RADIUS;
-
-
-    bike.rearWheelShapeId =
-        b2CreateCircleShape(
-            bike.rearWheelBodyId,
-            &rearWheelShapeDef,
-            &rearWheelCircle
-        );
-
-    b2Shape_SetFriction(
-        bike.rearWheelShapeId,
-        1.0f
-    );
-
-
-    // =====================================================
-    // FRONT WHEEL
-    // =====================================================
-
-    b2BodyDef frontWheelBodyDef =
-        b2DefaultBodyDef();
-
-    frontWheelBodyDef.type =
-        b2_dynamicBody;
-
-    // Right and below chassis.
-    frontWheelBodyDef.position =
-        b2Vec2{ 0.8f, -7.65f };
-
-
-    bike.frontWheelBodyId =
-        b2CreateBody(
-            worldId,
-            &frontWheelBodyDef
-        );
-
-
-    b2ShapeDef frontWheelShapeDef =
-        b2DefaultShapeDef();
-
-    frontWheelShapeDef.material.friction = 0.9f;
-
-    frontWheelShapeDef.density = 1.0f;
-
-
-    b2Circle frontWheelCircle;
-
-    frontWheelCircle.center =
-        b2Vec2{ 0.0f, 0.0f };
-
-    frontWheelCircle.radius =
-        WHEEL_RADIUS;
-
-    frontWheelShapeDef.material.friction = 0.9f;
-
-    bike.frontWheelShapeId =
-        b2CreateCircleShape(
-            bike.frontWheelBodyId,
-            &frontWheelShapeDef,
-            &frontWheelCircle
-        );
-
-    b2Shape_SetFriction(
-        bike.frontWheelShapeId,
-        1.0f
-    );
-
-
-    // =====================================================
- // REAR WHEEL JOINT
- // =====================================================
-
-    b2WheelJointDef rearWheelJointDef =
-        b2DefaultWheelJointDef();
-
-    rearWheelJointDef.bodyIdA =
-        bike.chassisBodyId;
-
-    rearWheelJointDef.bodyIdB =
-        bike.rearWheelBodyId;
-
-    rearWheelJointDef.localAnchorA =
-        b2Vec2{ -0.8f, -0.65f };
-
-    rearWheelJointDef.localAnchorB =
-        b2Vec2{ 0.0f, 0.0f };
-
-    rearWheelJointDef.localAxisA =
-        b2Vec2{ 0.0f, 1.0f };
-
-
-    // Suspension
-    rearWheelJointDef.enableSpring = true;
-    rearWheelJointDef.hertz = 4.0f;
-    rearWheelJointDef.dampingRatio = 0.7f;
-
-
-    // Suspension limits
-    rearWheelJointDef.enableLimit = true;
-    rearWheelJointDef.lowerTranslation = -0.15f;
-    rearWheelJointDef.upperTranslation = 0.15f;
-
-
-    // Motor
-    rearWheelJointDef.enableMotor = true;
-
-    // Starts stopped. W changes this later.
-    rearWheelJointDef.motorSpeed = 0.0f;
-
-    // Give it plenty of torque while testing.
-    rearWheelJointDef.maxMotorTorque = 100.0f;
-
-
-    // Chassis and wheel should not collide.
-    rearWheelJointDef.collideConnected = false;
-
-
-    bike.rearWheelJointId =
-        b2CreateWheelJoint(
-            worldId,
-            &rearWheelJointDef
-        );
-
-    // =====================================================
-    // FRONT WHEEL JOINT
-    // =====================================================
-
-    b2WheelJointDef frontWheelJointDef =
-        b2DefaultWheelJointDef();
-
-
-    frontWheelJointDef.bodyIdA =
-        bike.chassisBodyId;
-
-    frontWheelJointDef.bodyIdB =
-        bike.frontWheelBodyId;
-
-
-    frontWheelJointDef.localAnchorA =
-        b2Vec2{ 0.8f, -0.65f };
-
-
-    frontWheelJointDef.localAnchorB =
-        b2Vec2{ 0.0f, 0.0f };
-
-
-    frontWheelJointDef.localAxisA =
-        b2Vec2{ 0.0f, 1.0f };
-
-
-    frontWheelJointDef.enableSpring = true;
-
-    frontWheelJointDef.hertz = 4.0f;
-
-    frontWheelJointDef.dampingRatio = 0.7f;
-
-
-    frontWheelJointDef.enableLimit = true;
-
-    frontWheelJointDef.lowerTranslation = -0.15f;
-
-    frontWheelJointDef.upperTranslation = 0.15f;
-
-
-    frontWheelJointDef.collideConnected = false;
-
-
-    bike.frontWheelJointId =
-        b2CreateWheelJoint(
-            worldId,
-            &frontWheelJointDef
-        );
+    Bike bike =
+        CreateBike(worldId);
 
 
     // =====================================================
@@ -1538,105 +1268,12 @@ int main(int argc, char* argv[])
 
         while (physicsAccumulator >= physicsTimeStep)
         {
-            // ---------------------------------------------
-            // DRIVE
-            // ---------------------------------------------
-
-            if (!levelComplete && input.driveForward)
-            {
-                b2WheelJoint_SetMotorSpeed(
-                    bike.rearWheelJointId,
-                    -20.0f
-                );
-            }
-            else if (!levelComplete && input.driveBackward)
-            {
-                b2WheelJoint_SetMotorSpeed(
-                    bike.rearWheelJointId,
-                    20.0f
-                );
-            }
-            else
-            {
-                b2WheelJoint_SetMotorSpeed(
-                    bike.rearWheelJointId,
-                    0.0f
-                );
-            }
-
-
-            // ---------------------------------------------
-            // CURRENT ROTATION
-            // ---------------------------------------------
-
-            float angularVelocity =
-                b2Body_GetAngularVelocity(bike.chassisBodyId);
-
-            b2Rot chassisRotation =
-                b2Body_GetRotation(bike.chassisBodyId);
-
-            float chassisAngle =
-                b2Rot_GetAngle(chassisRotation);
-
-
-            // ---------------------------------------------
-         // GROUND / AIR BIKE CONTROL
-         // ---------------------------------------------
-
-            if (bikeGrounded)
-            {
-                // Controlled ground leaning.
-                float targetAngle = 0.0f;
-
-                if (input.leanBackward && !input.leanForward)
-                {
-                    targetAngle = 0.35f;
-                }
-                else if (input.leanForward && !input.leanBackward)
-                {
-                    targetAngle = -0.35f;
-                }
-
-                const float leanStrength = 8.0f;
-                const float leanDamping = 2.0f;
-
-                float angleError =
-                    targetAngle - chassisAngle;
-
-                float correctionTorque =
-                    (angleError * leanStrength)
-                    -
-                    (angularVelocity * leanDamping);
-
-                b2Body_ApplyTorque(
-                    bike.chassisBodyId,
-                    correctionTorque,
-                    true
-                );
-            }
-            else
-            {
-                // Free rotation while airborne.
-                const float airTorque = 20.0f;
-
-                if (input.leanBackward && !input.leanForward)
-                {
-                    b2Body_ApplyTorque(
-                        bike.chassisBodyId,
-                        airTorque,
-                        true
-                    );
-                }
-                else if (input.leanForward && !input.leanBackward)
-                {
-                    b2Body_ApplyTorque(
-                        bike.chassisBodyId,
-                        -airTorque,
-                        true
-                    );
-                }
-            }
-
+            UpdateBikeControls(
+                bike,
+                input,
+                bikeGrounded,
+                levelComplete
+            );
 
             // ---------------------------------------------
             // RUN BOX2D
@@ -1675,31 +1312,10 @@ int main(int argc, char* argv[])
             
             }
 
-            // ---------------------------------------------
-            // LIMIT ROTATION SPEED
-            // ---------------------------------------------
-
-            angularVelocity =
-                b2Body_GetAngularVelocity(bike.chassisBodyId);
-
-            const float maxAngularSpeed =
-                bikeGrounded ? 1.5f : 8.0f;
-
-            if (angularVelocity > maxAngularSpeed)
-            {
-                b2Body_SetAngularVelocity(
-                    bike.chassisBodyId,
-                    maxAngularSpeed
-                );
-            }
-
-            if (angularVelocity < -maxAngularSpeed)
-            {
-                b2Body_SetAngularVelocity(
-                    bike.chassisBodyId,
-                    -maxAngularSpeed
-                );
-            }
+            LimitBikeAngularSpeed(
+                bike,
+                bikeGrounded
+            );
 
 
             physicsAccumulator -= physicsTimeStep;
