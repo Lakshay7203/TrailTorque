@@ -36,7 +36,7 @@ add_subdirectory(
 add_executable(
     TrailTorque
     source/main.cpp
-)
+ "source/Bike.h" "source/Bike.cpp" "source/Input.h" "source/Terrain.h" "source/Terrain.cpp")
 
 
 # ---------------------------------------------------------
