@@ -3,6 +3,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include <box2d/box2d.h>
 #include <vector>
+#include "Bike.h"
 
 // ---------------------------------------------------------
 // CONSTANTS
@@ -1182,6 +1183,7 @@ int main(int argc, char* argv[])
         );
     }
 
+    Bike bike;
 
     // =====================================================
     // BIKE CHASSIS
@@ -1199,12 +1201,11 @@ int main(int argc, char* argv[])
         b2Vec2{ 0.0f, -7.0f };
 
 
-    b2BodyId chassisBodyId =
+    bike.chassisBodyId =
         b2CreateBody(
             worldId,
             &chassisBodyDef
         );
-
 
     b2ShapeDef chassisShapeDef =
         b2DefaultShapeDef();
@@ -1222,7 +1223,7 @@ int main(int argc, char* argv[])
 
     b2ShapeId chassisShapeId =
         b2CreatePolygonShape(
-            chassisBodyId,
+            bike.chassisBodyId,
             &chassisShapeDef,
             &chassisShape
         );
@@ -1243,7 +1244,7 @@ int main(int argc, char* argv[])
         b2Vec2{ -0.8f, -7.65f };
 
 
-    b2BodyId rearWheelBodyId =
+    bike.rearWheelBodyId =
         b2CreateBody(
             worldId,
             &rearWheelBodyDef
@@ -1267,15 +1268,15 @@ int main(int argc, char* argv[])
         WHEEL_RADIUS;
 
 
-    b2ShapeId rearWheelShapeId =
+    bike.rearWheelShapeId =
         b2CreateCircleShape(
-            rearWheelBodyId,
+            bike.rearWheelBodyId,
             &rearWheelShapeDef,
             &rearWheelCircle
         );
 
     b2Shape_SetFriction(
-        rearWheelShapeId,
+        bike.rearWheelShapeId,
         1.0f
     );
 
@@ -1295,7 +1296,7 @@ int main(int argc, char* argv[])
         b2Vec2{ 0.8f, -7.65f };
 
 
-    b2BodyId frontWheelBodyId =
+    bike.frontWheelBodyId =
         b2CreateBody(
             worldId,
             &frontWheelBodyDef
@@ -1320,15 +1321,15 @@ int main(int argc, char* argv[])
 
     frontWheelShapeDef.material.friction = 0.9f;
 
-    b2ShapeId frontWheelShapeId =
+    bike.frontWheelShapeId =
         b2CreateCircleShape(
-            frontWheelBodyId,
+            bike.frontWheelBodyId,
             &frontWheelShapeDef,
             &frontWheelCircle
         );
 
     b2Shape_SetFriction(
-        frontWheelShapeId,
+        bike.frontWheelShapeId,
         1.0f
     );
 
@@ -1341,10 +1342,10 @@ int main(int argc, char* argv[])
         b2DefaultWheelJointDef();
 
     rearWheelJointDef.bodyIdA =
-        chassisBodyId;
+        bike.chassisBodyId;
 
     rearWheelJointDef.bodyIdB =
-        rearWheelBodyId;
+        bike.rearWheelBodyId;
 
     rearWheelJointDef.localAnchorA =
         b2Vec2{ -0.8f, -0.65f };
@@ -1382,7 +1383,7 @@ int main(int argc, char* argv[])
     rearWheelJointDef.collideConnected = false;
 
 
-    b2JointId rearWheelJointId =
+    bike.rearWheelJointId =
         b2CreateWheelJoint(
             worldId,
             &rearWheelJointDef
@@ -1397,10 +1398,10 @@ int main(int argc, char* argv[])
 
 
     frontWheelJointDef.bodyIdA =
-        chassisBodyId;
+        bike.chassisBodyId;
 
     frontWheelJointDef.bodyIdB =
-        frontWheelBodyId;
+        bike.frontWheelBodyId;
 
 
     frontWheelJointDef.localAnchorA =
@@ -1432,7 +1433,7 @@ int main(int argc, char* argv[])
     frontWheelJointDef.collideConnected = false;
 
 
-    b2JointId frontWheelJointId =
+    bike.frontWheelJointId =
         b2CreateWheelJoint(
             worldId,
             &frontWheelJointDef
@@ -1516,69 +1517,11 @@ int main(int argc, char* argv[])
                     b2Vec2{ 0.0f, -7.0f };
             }
 
-            // Reset chassis.
-            b2Body_SetTransform(
-                chassisBodyId,
-                respawnPosition,
-                b2MakeRot(0.0f)
+            ResetBike(
+                bike,
+                respawnPosition
             );
 
-            // Reset rear wheel.
-            b2Body_SetTransform(
-                rearWheelBodyId,
-                b2Vec2{
-                    respawnPosition.x - 0.8f,
-                    respawnPosition.y - 0.65f
-                },
-                b2MakeRot(0.0f)
-            );
-
-            // Reset front wheel.
-            b2Body_SetTransform(
-                frontWheelBodyId,
-                b2Vec2{
-                    respawnPosition.x + 0.8f,
-                    respawnPosition.y - 0.65f
-                },
-                b2MakeRot(0.0f)
-            );
-
-
-            // Remove all movement.
-            b2Body_SetLinearVelocity(
-                chassisBodyId,
-                b2Vec2{ 0.0f, 0.0f }
-            );
-
-            b2Body_SetLinearVelocity(
-                rearWheelBodyId,
-                b2Vec2{ 0.0f, 0.0f }
-            );
-
-            b2Body_SetLinearVelocity(
-                frontWheelBodyId,
-                b2Vec2{ 0.0f, 0.0f }
-            );
-
-
-            // Remove all spinning.
-            b2Body_SetAngularVelocity(
-                chassisBodyId,
-                0.0f
-            );
-
-            b2Body_SetAngularVelocity(
-                rearWheelBodyId,
-                0.0f
-            );
-
-            b2Body_SetAngularVelocity(
-                frontWheelBodyId,
-                0.0f
-            );
-
-
-            // Put camera back at the starting area.
             cameraX = respawnPosition.x;
 
             bikeGrounded = true;
@@ -1602,21 +1545,21 @@ int main(int argc, char* argv[])
             if (!levelComplete && input.driveForward)
             {
                 b2WheelJoint_SetMotorSpeed(
-                    rearWheelJointId,
+                    bike.rearWheelJointId,
                     -20.0f
                 );
             }
             else if (!levelComplete && input.driveBackward)
             {
                 b2WheelJoint_SetMotorSpeed(
-                    rearWheelJointId,
+                    bike.rearWheelJointId,
                     20.0f
                 );
             }
             else
             {
                 b2WheelJoint_SetMotorSpeed(
-                    rearWheelJointId,
+                    bike.rearWheelJointId,
                     0.0f
                 );
             }
@@ -1627,10 +1570,10 @@ int main(int argc, char* argv[])
             // ---------------------------------------------
 
             float angularVelocity =
-                b2Body_GetAngularVelocity(chassisBodyId);
+                b2Body_GetAngularVelocity(bike.chassisBodyId);
 
             b2Rot chassisRotation =
-                b2Body_GetRotation(chassisBodyId);
+                b2Body_GetRotation(bike.chassisBodyId);
 
             float chassisAngle =
                 b2Rot_GetAngle(chassisRotation);
@@ -1666,7 +1609,7 @@ int main(int argc, char* argv[])
                     (angularVelocity * leanDamping);
 
                 b2Body_ApplyTorque(
-                    chassisBodyId,
+                    bike.chassisBodyId,
                     correctionTorque,
                     true
                 );
@@ -1679,7 +1622,7 @@ int main(int argc, char* argv[])
                 if (input.leanBackward && !input.leanForward)
                 {
                     b2Body_ApplyTorque(
-                        chassisBodyId,
+                        bike.chassisBodyId,
                         airTorque,
                         true
                     );
@@ -1687,7 +1630,7 @@ int main(int argc, char* argv[])
                 else if (input.leanForward && !input.leanBackward)
                 {
                     b2Body_ApplyTorque(
-                        chassisBodyId,
+                        bike.chassisBodyId,
                         -airTorque,
                         true
                     );
@@ -1710,14 +1653,14 @@ int main(int argc, char* argv[])
 
             int rearContactCount =
                 b2Shape_GetContactData(
-                    rearWheelShapeId,
+                    bike.rearWheelShapeId,
                     rearContacts,
                     4
                 );
 
             int frontContactCount =
                 b2Shape_GetContactData(
-                    frontWheelShapeId,
+                    bike.frontWheelShapeId,
                     frontContacts,
                     4
                 );
@@ -1761,7 +1704,7 @@ int main(int argc, char* argv[])
             // ---------------------------------------------
 
             angularVelocity =
-                b2Body_GetAngularVelocity(chassisBodyId);
+                b2Body_GetAngularVelocity(bike.chassisBodyId);
 
             const float maxAngularSpeed =
                 bikeGrounded ? 1.5f : 8.0f;
@@ -1769,7 +1712,7 @@ int main(int argc, char* argv[])
             if (angularVelocity > maxAngularSpeed)
             {
                 b2Body_SetAngularVelocity(
-                    chassisBodyId,
+                    bike.chassisBodyId,
                     maxAngularSpeed
                 );
             }
@@ -1777,7 +1720,7 @@ int main(int argc, char* argv[])
             if (angularVelocity < -maxAngularSpeed)
             {
                 b2Body_SetAngularVelocity(
-                    chassisBodyId,
+                    bike.chassisBodyId,
                     -maxAngularSpeed
                 );
             }
@@ -1794,7 +1737,7 @@ int main(int argc, char* argv[])
 
         b2Vec2 chassisPosition =
             b2Body_GetPosition(
-                chassisBodyId
+                bike.chassisBodyId
             );
 
         if (chassisPosition.x >= FINISH_X)
@@ -1822,13 +1765,13 @@ int main(int argc, char* argv[])
 
         b2Vec2 rearWheelPosition =
             b2Body_GetPosition(
-                rearWheelBodyId
+                bike.rearWheelBodyId
             );
 
 
         b2Vec2 frontWheelPosition =
             b2Body_GetPosition(
-                frontWheelBodyId
+                bike.frontWheelBodyId
             );
 
 
@@ -1908,7 +1851,7 @@ int main(int argc, char* argv[])
         Render(
             renderer,
             font,
-            chassisBodyId,
+            bike.chassisBodyId,
             cameraX,
             groundRect,
             rearWheelScreen,
