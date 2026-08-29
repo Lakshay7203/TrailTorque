@@ -7,6 +7,8 @@
 #include "Bike.h"
 #include "Input.h"
 #include "Terrain.h"
+#include <algorithm>
+#include <cmath>
 
 // ---------------------------------------------------------
 // CONSTANTS
@@ -772,9 +774,62 @@ void Render(
         255
     );
 
+    SDL_FRect visualGround =
+    {
+        groundRect.x,
+        groundRect.y,
+        groundRect.w,
+        SCREEN_HEIGHT - groundRect.y
+    };
+
     SDL_RenderFillRect(
         renderer,
-        &groundRect
+        &visualGround
+    );
+
+    // Light dirt near surface.
+    SDL_FRect topDirt =
+    {
+        groundRect.x,
+        groundRect.y,
+        groundRect.w,
+        25.0f
+    };
+
+    SDL_SetRenderDrawColor(
+        renderer,
+        145,
+        92,
+        45,
+        255
+    );
+
+    SDL_RenderFillRect(
+        renderer,
+        &topDirt
+    );
+
+
+    // Medium dirt layer.
+    SDL_FRect middleDirt =
+    {
+        groundRect.x,
+        groundRect.y + 25.0f,
+        groundRect.w,
+        25.0f
+    };
+
+    SDL_SetRenderDrawColor(
+        renderer,
+        120,
+        72,
+        35,
+        255
+    );
+
+    SDL_RenderFillRect(
+        renderer,
+        &middleDirt
     );
 
 
@@ -857,13 +912,79 @@ void Render(
                     percentage;
 
 
+                const float baseGroundY =
+                    groundRect.y;
+
+
+// =====================================================
+// CONTINUOUS HILL DIRT
+// =====================================================
+
+// Deep earth.
+// This goes from the hill surface all the way down,
+// so the hill visually becomes part of the ground.
+                SDL_SetRenderDrawColor(
+                    renderer,
+                    95,
+                    55,
+                    30,
+                    255
+                );
+
                 SDL_RenderLine(
                     renderer,
                     static_cast<float>(x),
                     surfaceY,
                     static_cast<float>(x),
-                    SCREEN_HEIGHT
+                    groundRect.y
                 );
+
+
+                float middleBottom =
+                    std::min(
+                        surfaceY + 40.0f,
+                        groundRect.y
+                    );
+
+                SDL_SetRenderDrawColor(
+                    renderer,
+                    125,
+                    75,
+                    38,
+                    255
+                );
+
+                SDL_RenderLine(
+                    renderer,
+                    static_cast<float>(x),
+                    surfaceY,
+                    static_cast<float>(x),
+                    middleBottom
+                );
+
+
+                float topBottom =
+                    std::min(
+                        surfaceY + 15.0f,
+                        groundRect.y
+                    );
+
+                SDL_SetRenderDrawColor(
+                    renderer,
+                    155,
+                    100,
+                    50,
+                    255
+                );
+
+                SDL_RenderLine(
+                    renderer,
+                    static_cast<float>(x),
+                    surfaceY,
+                    static_cast<float>(x),
+                    topBottom
+                );
+                
             }
         }
 
@@ -872,17 +993,35 @@ void Render(
         // GRASS SURFACE
         // -------------------------------------------------
 
+        // Dark grass shadow.
         SDL_SetRenderDrawColor(
             renderer,
-            60,
-            160,
-            70,
+            35,
+            110,
+            45,
             255
         );
 
+        SDL_RenderLine(
+            renderer,
+            startScreen.x,
+            startScreen.y + 4.0f,
+            endScreen.x,
+            endScreen.y + 4.0f
+        );
 
-        for (int thickness = -2;
-            thickness <= 2;
+
+        // Bright grass surface.
+        SDL_SetRenderDrawColor(
+            renderer,
+            70,
+            180,
+            75,
+            255
+        );
+
+        for (int thickness = -1;
+            thickness <= 1;
             ++thickness)
         {
             SDL_RenderLine(
@@ -893,7 +1032,93 @@ void Render(
                 endScreen.y + thickness
             );
         }
+// =====================================================
+// NATURAL GRASS TUFTS
+// =====================================================
+
+        float terrainDX =
+            endScreen.x - startScreen.x;
+
+        float terrainDY =
+            endScreen.y - startScreen.y;
+
+        float terrainLength =
+            std::sqrt(
+                terrainDX * terrainDX +
+                terrainDY * terrainDY
+            );
+
+        if (terrainLength > 0.0f)
+        {
+            // Direction pointing away from the terrain surface.
+            float normalX =
+                terrainDY / terrainLength;
+
+            float normalY =
+                -terrainDX / terrainLength;
+
+            SDL_SetRenderDrawColor(
+                renderer,
+                45,
+                135,
+                50,
+                255
+            );
+
+            // Add several small grass clumps.
+            for (float t = 0.06f;
+                t < 1.0f;
+                t += 0.05f)
+            {
+                float grassX =
+                    startScreen.x +
+                    terrainDX * t;
+
+                float grassY =
+                    startScreen.y +
+                    terrainDY * t;
+
+                float grassHeight =
+                    3.0f +
+                    static_cast<int>(t * 1000.0f) % 5;
+
+                // Middle blade.
+                SDL_RenderLine(
+                    renderer,
+                    grassX,
+                    grassY,
+                    grassX + normalX * grassHeight,
+                    grassY + normalY * grassHeight
+                );
+
+                // Left blade.
+                SDL_RenderLine(
+                    renderer,
+                    grassX,
+                    grassY,
+                    grassX +
+                    normalX * grassHeight -
+                    2.0f,
+                    grassY +
+                    normalY * grassHeight
+                );
+
+                // Right blade.
+                SDL_RenderLine(
+                    renderer,
+                    grassX,
+                    grassY,
+                    grassX +
+                    normalX * grassHeight +
+                    2.0f,
+                    grassY +
+                    normalY * grassHeight
+                );
+            }
+        }
+        
     }
+
 
 
     // =====================================================
@@ -921,7 +1146,56 @@ void Render(
         );
     }
 
-    // =====================================================
+// =====================================================
+// FLAT GROUND GRASS TUFTS
+// =====================================================
+
+    SDL_SetRenderDrawColor(
+        renderer,
+        45,
+        135,
+        50,
+        255
+    );
+
+    int grassIndex = 0;
+
+    for (float x = groundRect.x + 10.0f;
+        x < groundRect.x + groundRect.w;
+        x += 12.0f, ++grassIndex)
+    {
+        float grassY = groundRect.y;
+
+        float grassHeight =
+            3.0f +
+            grassIndex % 5;
+
+        SDL_RenderLine(
+            renderer,
+            x,
+            grassY,
+            x,
+            grassY - grassHeight
+        );
+
+        SDL_RenderLine(
+            renderer,
+            x,
+            grassY,
+            x - 2.0f,
+            grassY - grassHeight
+        );
+
+        SDL_RenderLine(
+            renderer,
+            x,
+            grassY,
+            x + 2.0f,
+            grassY - grassHeight
+        );
+    }
+
+// =====================================================
 // FINISH LINE
 // =====================================================
 
