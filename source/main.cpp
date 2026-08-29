@@ -1,6 +1,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3_ttf/SDL_ttf.h>
+#include <SDL3_image/SDL_image.h>
 #include <box2d/box2d.h>
 #include <vector>
 #include "Bike.h"
@@ -562,7 +563,11 @@ void DrawCheckpoint(
 void Render(
     SDL_Renderer* renderer,
     TTF_Font* font,
+    SDL_Texture* bikeTexture,
+    SDL_Texture* wheelTexture,
     b2BodyId chassisBodyId,
+    b2BodyId rearWheelBodyId,
+    b2BodyId frontWheelBodyId,
     float cameraX,
     const SDL_FRect& groundRect,
     const SDL_FPoint& rearWheelScreen,
@@ -930,57 +935,151 @@ void Render(
         cameraX,
         checkpointReached
     );
+// =====================================================
+// BIKE CHASSIS SPRITE
+// =====================================================
 
-    // =====================================================
-    // CHASSIS
-    // =====================================================
+    b2Vec2 chassisPosition =
+        b2Body_GetPosition(chassisBodyId);
 
-    SDL_SetRenderDrawColor(
-        renderer,
-        0,
-        180,
-        0,
-        255
-    );
+    b2Rot chassisRotation =
+        b2Body_GetRotation(chassisBodyId);
 
-    DrawRotatedChassis(
-        renderer,
-        chassisBodyId,
-        cameraX
-    );
+    float chassisAngleRadians =
+        b2Rot_GetAngle(chassisRotation);
 
-
-    // =====================================================
-    // WHEELS
-    // =====================================================
-
-    SDL_SetRenderDrawColor(
-        renderer,
-        30,
-        30,
-        30,
-        255
-    );
+    double chassisAngleDegrees =
+        chassisAngleRadians *
+        180.0 /
+        3.14159265;
 
 
-    const float wheelRadiusPixels =
-        BIKE_WHEEL_RADIUS *
+    // Convert Box2D position -> SDL screen.
+    float chassisScreenX =
+        CAMERA_TARGET_X +
+        (chassisPosition.x - cameraX) *
+        PIXELS_PER_METER;
+
+    float chassisScreenY =
+        SCREEN_CENTER_Y -
+        chassisPosition.y *
         PIXELS_PER_METER;
 
 
-    DrawFilledCircle(
+    // Size of visual bike sprite.
+    // We will tune these after seeing it.
+    SDL_FRect bikeRect;
+
+    bikeRect.w = 145.0f;
+    bikeRect.h = 48.0f;
+
+    bikeRect.x =
+        chassisScreenX -
+        bikeRect.w / 2.0f;
+
+    bikeRect.y =
+        chassisScreenY -
+        bikeRect.h / 2.0f;
+
+
+    SDL_RenderTextureRotated(
         renderer,
-        rearWheelScreen.x,
-        rearWheelScreen.y,
-        wheelRadiusPixels
+        bikeTexture,
+        nullptr,
+        &bikeRect,
+        -chassisAngleDegrees,
+        nullptr,
+        SDL_FLIP_NONE
+    );
+
+    // =====================================================
+    // WHEEL SPRITES
+    // =====================================================
+
+    const float wheelDiameter =
+        BIKE_WHEEL_RADIUS *
+        2.0f *
+        PIXELS_PER_METER *
+        1.6f;
+
+
+    // Rear wheel rotation.
+    float rearWheelAngleRadians =
+        b2Rot_GetAngle(
+            b2Body_GetRotation(rearWheelBodyId)
+        );
+
+    double rearWheelAngleDegrees =
+        rearWheelAngleRadians *
+        180.0 /
+        3.14159265;
+
+
+    // Front wheel rotation.
+    float frontWheelAngleRadians =
+        b2Rot_GetAngle(
+            b2Body_GetRotation(frontWheelBodyId)
+        );
+
+    double frontWheelAngleDegrees =
+        frontWheelAngleRadians *
+        180.0 /
+        3.14159265;
+
+
+    // Rear wheel rectangle.
+    SDL_FRect rearWheelRect;
+
+    rearWheelRect.w = wheelDiameter;
+    rearWheelRect.h = wheelDiameter;
+
+    rearWheelRect.x =
+        rearWheelScreen.x -
+        rearWheelRect.w / 2.0f;
+
+    rearWheelRect.y =
+        rearWheelScreen.y -
+        rearWheelRect.h / 2.0f;
+
+
+    // Front wheel rectangle.
+    SDL_FRect frontWheelRect;
+
+    frontWheelRect.w = wheelDiameter;
+    frontWheelRect.h = wheelDiameter;
+
+    frontWheelRect.x =
+        frontWheelScreen.x -
+        frontWheelRect.w / 2.0f +
+        10.0f;
+
+    frontWheelRect.y =
+        frontWheelScreen.y -
+        frontWheelRect.h / 2.0f -
+        1.0f;
+
+
+    // Draw rear wheel.
+    SDL_RenderTextureRotated(
+        renderer,
+        wheelTexture,
+        nullptr,
+        &rearWheelRect,
+        -rearWheelAngleDegrees,
+        nullptr,
+        SDL_FLIP_NONE
     );
 
 
-    DrawFilledCircle(
+    // Draw front wheel.
+    SDL_RenderTextureRotated(
         renderer,
-        frontWheelScreen.x,
-        frontWheelScreen.y,
-        wheelRadiusPixels
+        wheelTexture,
+        nullptr,
+        &frontWheelRect,
+        -frontWheelAngleDegrees,
+        nullptr,
+        SDL_FLIP_NONE
     );
 
     // =====================================================
@@ -1067,6 +1166,45 @@ int main(int argc, char* argv[])
     SDL_Renderer* renderer =
         SDL_CreateRenderer(window, nullptr);
 
+    SDL_Texture* bikeTexture =
+        IMG_LoadTexture(
+            renderer,
+            "assets/Bike/bike_chassis.png"
+        );
+
+    SDL_Texture* wheelTexture =
+        IMG_LoadTexture(
+            renderer,
+            "assets/Bike/bike_wheel.png"
+        );
+
+    SDL_SetTextureScaleMode(
+        bikeTexture,
+        SDL_SCALEMODE_NEAREST
+    );
+
+    SDL_SetTextureScaleMode(
+        wheelTexture,
+        SDL_SCALEMODE_NEAREST
+    );
+
+
+    if (!bikeTexture)
+    {
+        SDL_Log(
+            "Failed to load bike texture: %s",
+            SDL_GetError()
+        );
+    }
+
+    if (!wheelTexture)
+    {
+        SDL_Log(
+            "Failed to load wheel texture: %s",
+            SDL_GetError()
+        );
+    }
+
     if (!renderer)
     {
         SDL_Log(
@@ -1079,6 +1217,8 @@ int main(int argc, char* argv[])
 
         return 1;
     }
+
+
 
     TTF_Font* font =
         TTF_OpenFont(
@@ -1422,14 +1562,18 @@ int main(int argc, char* argv[])
         Render(
             renderer,
             font,
+            bikeTexture,
+            wheelTexture,
             bike.chassisBodyId,
+            bike.rearWheelBodyId,
+            bike.frontWheelBodyId,
             cameraX,
             groundRect,
             rearWheelScreen,
             frontWheelScreen,
             terrain.segments,
             levelComplete,
-			checkpointReached,
+            checkpointReached,
             levelTime,
             bestTime,
             newBestTime
@@ -1442,6 +1586,8 @@ int main(int argc, char* argv[])
     // =====================================================
 
     b2DestroyWorld(worldId);
+    SDL_DestroyTexture(bikeTexture);
+    SDL_DestroyTexture(wheelTexture);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

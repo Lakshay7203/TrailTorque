@@ -18,6 +18,7 @@ add_subdirectory(
 add_subdirectory(
     ThirdParty/Box2D
     EXCLUDE_FROM_ALL
+
 )
 
 # Don't build SDL_ttf sample programs.
@@ -25,6 +26,20 @@ set(SDLTTF_SAMPLES OFF CACHE BOOL "" FORCE)
 
 add_subdirectory(
     ThirdParty/SDL_ttf
+    EXCLUDE_FROM_ALL
+)
+
+# TrailTorque currently only needs PNG image loading.
+set(SDLIMAGE_AVIF OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_JXL OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_TIF OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_WEBP OFF CACHE BOOL "" FORCE)
+
+set(SDLIMAGE_SAMPLES OFF CACHE BOOL "" FORCE)
+set(SDLIMAGE_TESTS OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(
+    ThirdParty/SDL_image
     EXCLUDE_FROM_ALL
 )
 
@@ -49,9 +64,22 @@ target_link_libraries(
         SDL3::SDL3
         SDL3_ttf::SDL3_ttf
         box2d::box2d
+        SDL3_image::SDL3_image
 )
 
+add_custom_command(
+    TARGET TrailTorque POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:SDL3_image::SDL3_image>
+        $<TARGET_FILE_DIR:TrailTorque>
+)
 
+add_custom_command(
+    TARGET TrailTorque POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:TrailTorque>/assets
+)
 # ---------------------------------------------------------
 # WINDOWS DLL COPYING
 # ---------------------------------------------------------
