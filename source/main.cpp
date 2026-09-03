@@ -24,11 +24,14 @@ constexpr float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0f;
 
 constexpr float CAMERA_TARGET_X = 400.0f;
 
-constexpr float GROUND_HALF_WIDTH = 100.0f;
+constexpr float GROUND_HALF_WIDTH = 400.0f;
 constexpr float GROUND_HEIGHT = 2.0f;
 
-constexpr float FINISH_X = 90.0f;
-constexpr float CHECKPOINT_X = 35.0f;
+constexpr float FINISH_X = 315.0f;
+constexpr float CHECKPOINT_X = 155.0f;
+
+
+
 
 void ProcessInput(
     bool& running,
