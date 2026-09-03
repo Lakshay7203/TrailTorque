@@ -575,10 +575,9 @@ void DrawCheckpoint(
         (CHECKPOINT_X - cameraX) *
         PIXELS_PER_METER;
 
-    // Ground surface is y = -9 in Box2D.
-    const float groundScreenY =
+    const float checkpointGroundY =
         SCREEN_CENTER_Y -
-        (-9.0f * PIXELS_PER_METER);
+        (-4.0f * PIXELS_PER_METER);
 
     // Yellow before reaching it, green afterwards.
     if (checkpointReached)
@@ -605,7 +604,7 @@ void DrawCheckpoint(
     SDL_FRect pole =
     {
         checkpointScreenX,
-        groundScreenY - 110.0f,
+        checkpointGroundY - 110.0f,
         6.0f,
         110.0f
     };
@@ -619,7 +618,7 @@ void DrawCheckpoint(
     SDL_FRect flag =
     {
         checkpointScreenX + 6.0f,
-        groundScreenY - 110.0f,
+        checkpointGroundY - 110.0f,
         55.0f,
         30.0f
     };
@@ -1576,6 +1575,7 @@ int main(int argc, char* argv[])
     char stuntText[64] = "";
     float stuntTextTimer = 0.0f;
     int score = 0;
+    int checkpointScore = 0;
 
     b2Vec2 respawnPosition =
         b2Vec2{ 0.0f, -7.0f };
@@ -1639,7 +1639,6 @@ int main(int argc, char* argv[])
 
         if (input.resetPressed)
         {
-
             if (levelComplete)
             {
                 checkpointReached = false;
@@ -1648,6 +1647,10 @@ int main(int argc, char* argv[])
                     b2Vec2{ 0.0f, -7.0f };
 
                 levelTime = 0.0f;
+
+                // Full new run.
+                score = 0;
+                checkpointScore = 0;
             }
 
             ResetBike(
@@ -1658,11 +1661,22 @@ int main(int argc, char* argv[])
             cameraX = respawnPosition.x;
 
             bikeGrounded = true;
-
             levelComplete = false;
 
+            // Restore score from last checkpoint.
+            score = checkpointScore;
+
+            // Clear stunt state.
             airTime = 0.0f;
             wasBikeGrounded = true;
+
+            accumulatedRotation = 0.0f;
+
+            positiveFlipCompleted = false;
+            negativeFlipCompleted = false;
+
+            stuntText[0] = '\0';
+            stuntTextTimer = 0.0f;
         }
 
 
@@ -1966,7 +1980,9 @@ int main(int argc, char* argv[])
             checkpointReached = true;
 
             respawnPosition =
-                b2Vec2{ CHECKPOINT_X, -7.0f };
+                b2Vec2{ CHECKPOINT_X, -1.5f };
+
+            checkpointScore = score;
         }
 
         // Camera gradually catches up to the bike.
