@@ -348,6 +348,7 @@ void DrawText(
 void DrawUI(
     SDL_Renderer* renderer,
     TTF_Font* font,
+    TTF_Font* stuntFont,
     bool levelComplete,
     float levelTime,
     float airTime,
@@ -551,7 +552,7 @@ void DrawUI(
     {
         DrawText(
             renderer,
-            font,
+            stuntFont,
             stuntText,
             SCREEN_WIDTH / 2.0f - 100.0f,
             80.0f,
@@ -633,6 +634,7 @@ void DrawCheckpoint(
 void Render(
     SDL_Renderer* renderer,
     TTF_Font* font,
+    TTF_Font* stuntFont,
     SDL_Texture* bikeTexture,
     SDL_Texture* wheelTexture,
     b2BodyId chassisBodyId,
@@ -1333,6 +1335,7 @@ void Render(
     DrawUI(
         renderer,
         font,
+        stuntFont,
         levelComplete,
         levelTime,
         airTime,
@@ -1469,9 +1472,16 @@ int main(int argc, char* argv[])
 
     TTF_Font* font =
         TTF_OpenFont(
-            "C:/Windows/Fonts/arial.ttf",
-            24.0f
+            "assets/Fonts/Bangers-Regular.ttf",
+            28.0f
         );
+
+    TTF_Font* stuntFont =
+        TTF_OpenFont(
+            "assets/Fonts/Bangers-Regular.ttf",
+            48.0f
+        );
+        
 
     if (!font)
     {
@@ -2053,6 +2063,7 @@ int main(int argc, char* argv[])
         Render(
             renderer,
             font,
+            stuntFont,
             bikeTexture,
             wheelTexture,
             bike.chassisBodyId,
