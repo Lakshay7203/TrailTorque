@@ -353,6 +353,7 @@ void DrawUI(
     float airTime,
     const char* stuntText,
     float stuntTextTimer,
+    int score,
     float bestTime,
     bool newBestTime)
 {
@@ -380,6 +381,15 @@ void DrawUI(
         sizeof(airTimeText),
         "Air Time: %.2f",
         airTime
+    );
+
+    char scoreText[64];
+
+    SDL_snprintf(
+        scoreText,
+        sizeof(scoreText),
+        "Score: %d",
+        score
     );
 
     SDL_Color white =
@@ -426,6 +436,15 @@ void DrawUI(
             timerText,
             SCREEN_WIDTH - 180.0f,
             25.0f,
+            white
+        );
+
+        DrawText(
+            renderer,
+            font,
+            scoreText,
+            SCREEN_WIDTH - 180.0f,
+            55.0f,
             white
         );
 
@@ -630,6 +649,7 @@ void Render(
     float airTime,
     const char* stuntText,
     float stuntTextTimer,
+    int score,
     float bestTime,
     bool newBestTime)
 {
@@ -1318,6 +1338,7 @@ void Render(
         airTime,
         stuntText,
         stuntTextTimer,
+        score,
         bestTime,
         newBestTime
     );
@@ -1533,6 +1554,7 @@ int main(int argc, char* argv[])
 
     bool positiveFlipCompleted = false;
     bool negativeFlipCompleted = false;
+    int flipCount = 0;
 
     // No best time exists yet so -1
     float bestTime = -1.0f;
@@ -1746,6 +1768,8 @@ int main(int argc, char* argv[])
 
                 positiveFlipCompleted = false;
                 negativeFlipCompleted = false;
+
+                flipCount = 0;
             }
             if (!bikeGrounded)
             {
@@ -1819,9 +1843,12 @@ int main(int argc, char* argv[])
 
                     if (positiveFlipCompleted)
                     {
-                        SDL_Log("FRONT FLIP DETECTED");
-
                         score += 500;
+
+                        SDL_Log(
+                            "FRONT FLIP DETECTED | SCORE: %d",
+                            score
+                        );
 
                         SDL_snprintf(
                             stuntText,
@@ -1834,9 +1861,12 @@ int main(int argc, char* argv[])
 
                     if (negativeFlipCompleted)
                     {
-                        SDL_Log("BACKFLIP DETECTED");
-
                         score += 500;
+
+                        SDL_Log(
+                            "BACKFLIP DETECTED | SCORE: %d",
+                            score
+                        );
 
                         SDL_snprintf(
                             stuntText,
@@ -2039,6 +2069,7 @@ int main(int argc, char* argv[])
             airTime,
             stuntText,
             stuntTextTimer,
+            score,
             bestTime,
             newBestTime
         );
