@@ -350,7 +350,8 @@ void DrawUI(
     TTF_Font* font,
     bool levelComplete,
     float levelTime,
-    float bestTime,
+    float airTime,
+    float bestTime, 
     bool newBestTime)
 {
     char timerText[64];
@@ -368,6 +369,15 @@ void DrawUI(
         "Time: %02d:%05.2f",
         minutes,
         seconds
+    );
+
+    char airTimeText[64];
+
+    SDL_snprintf(
+        airTimeText,
+        sizeof(airTimeText),
+        "Air Time: %.2f",
+        airTime
     );
 
     SDL_Color white =
@@ -416,6 +426,18 @@ void DrawUI(
             25.0f,
             white
         );
+
+        if (airTime > 0.0f)
+        {
+            DrawText(
+                renderer,
+                font,
+                airTimeText,
+                SCREEN_WIDTH / 2.0f - 80.0f,
+                40.0f,
+                white
+            );
+        }
     }
     else
     {
@@ -590,6 +612,7 @@ void Render(
     bool levelComplete,
     bool checkpointReached,
     float levelTime,
+    float airTime,
     float bestTime,
     bool newBestTime)
 {
@@ -1275,8 +1298,9 @@ void Render(
         font,
         levelComplete,
         levelTime,
-		bestTime,
-		newBestTime
+        airTime,
+        bestTime,
+        newBestTime
     );
 
     // =====================================================
@@ -1482,6 +1506,15 @@ int main(int argc, char* argv[])
 
     float levelTime = 0.0f;
 
+    float airTime = 0.0f;
+    bool wasBikeGrounded = true;
+
+    float previousBikeAngle = 0.0f;
+    float accumulatedRotation = 0.0f;
+
+    bool positiveFlipCompleted = false;
+    bool negativeFlipCompleted = false;
+
     // No best time exists yet so -1
     float bestTime = -1.0f;
     bool newBestTime = false;
@@ -1549,6 +1582,9 @@ int main(int argc, char* argv[])
             bikeGrounded = true;
 
             levelComplete = false;
+
+            airTime = 0.0f;
+            wasBikeGrounded = true;
         }
 
 
@@ -1631,6 +1667,133 @@ int main(int argc, char* argv[])
 
             bikeGrounded =
                 IsBikeGrounded(bike);
+
+            bool justLeftGround =
+                wasBikeGrounded &&
+                !bikeGrounded;
+
+            bool justLanded =
+                !wasBikeGrounded &&
+                bikeGrounded;
+            if (justLeftGround)
+            {
+                SDL_Log("LEFT GROUND");
+            }
+
+            if (justLanded)
+            {
+                SDL_Log(
+                    "LANDED | AirTime: %.2f | Rotation: %.2f",
+                    airTime,
+                    accumulatedRotation
+                );
+            }
+
+            float currentBikeAngle =
+                b2Rot_GetAngle(
+                    b2Body_GetRotation(
+                        bike.chassisBodyId
+                    )
+                );
+
+            if (justLeftGround)
+            {
+                accumulatedRotation = 0.0f;
+                previousBikeAngle = currentBikeAngle;
+
+                positiveFlipCompleted = false;
+                negativeFlipCompleted = false;
+            }
+            if (!bikeGrounded)
+            {
+                float angleDifference =
+                    currentBikeAngle -
+                    previousBikeAngle;
+
+                constexpr float PI =
+                    3.14159265f;
+
+                // Fix angle wrap from +PI to -PI.
+                if (angleDifference > PI)
+                {
+                    angleDifference -=
+                        2.0f * PI;
+                }
+
+                if (angleDifference < -PI)
+                {
+                    angleDifference +=
+                        2.0f * PI;
+                }
+
+                accumulatedRotation +=
+                    angleDifference;
+
+                constexpr float FLIP_THRESHOLD = 5.5f;
+
+                if (accumulatedRotation >= FLIP_THRESHOLD)
+                {
+                    positiveFlipCompleted = true;
+                }
+
+                if (accumulatedRotation <= -FLIP_THRESHOLD)
+                {
+                    negativeFlipCompleted = true;
+                }
+
+                previousBikeAngle =
+                    currentBikeAngle;
+            }
+            // ---------------------------------------------
+            // AIR TIME
+            // ---------------------------------------------
+
+            if (!bikeGrounded)
+            {
+                airTime += physicsTimeStep;
+            }
+
+            if (!wasBikeGrounded && bikeGrounded)
+            {
+                // =========================
+                // AIR TIME LANDING
+                // =========================
+
+                if (airTime >= 0.5f)
+                {
+                    SDL_Log(
+                        "AIR TIME: %.2f seconds",
+                        airTime
+                    );
+                }
+                if (justLanded)
+                {
+                    SDL_Log(
+                        "LANDED | AirTime: %.2f | Rotation: %.2f",
+                        airTime,
+                        accumulatedRotation
+                    );
+
+                    if (positiveFlipCompleted)
+                    {
+                        SDL_Log("FULL FLIP - POSITIVE");
+                    }
+
+                    if (negativeFlipCompleted)
+                    {
+                        SDL_Log("FULL FLIP - NEGATIVE");
+                    }
+
+                    airTime = 0.0f;
+                    accumulatedRotation = 0.0f;
+                }
+
+                // Reset jump data.
+                airTime = 0.0f;
+                accumulatedRotation = 0.0f;
+            }
+
+            wasBikeGrounded = bikeGrounded;
 
             if (levelComplete)
             {
@@ -1810,6 +1973,7 @@ int main(int argc, char* argv[])
             levelComplete,
             checkpointReached,
             levelTime,
+            airTime,
             bestTime,
             newBestTime
         );
