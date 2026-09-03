@@ -351,7 +351,9 @@ void DrawUI(
     bool levelComplete,
     float levelTime,
     float airTime,
-    float bestTime, 
+    const char* stuntText,
+    float stuntTextTimer,
+    float bestTime,
     bool newBestTime)
 {
     char timerText[64];
@@ -438,6 +440,7 @@ void DrawUI(
                 white
             );
         }
+        
     }
     else
     {
@@ -521,6 +524,18 @@ void DrawUI(
             "Press R to restart",
             SCREEN_WIDTH / 2.0f - 105.0f,
             260.0f,
+            white
+        );
+    }
+
+    if (stuntTextTimer > 0.0f)
+    {
+        DrawText(
+            renderer,
+            font,
+            stuntText,
+            SCREEN_WIDTH / 2.0f - 100.0f,
+            80.0f,
             white
         );
     }
@@ -613,6 +628,8 @@ void Render(
     bool checkpointReached,
     float levelTime,
     float airTime,
+    const char* stuntText,
+    float stuntTextTimer,
     float bestTime,
     bool newBestTime)
 {
@@ -1299,6 +1316,8 @@ void Render(
         levelComplete,
         levelTime,
         airTime,
+        stuntText,
+        stuntTextTimer,
         bestTime,
         newBestTime
     );
@@ -1519,6 +1538,10 @@ int main(int argc, char* argv[])
     float bestTime = -1.0f;
     bool newBestTime = false;
 
+    char stuntText[64] = "";
+    float stuntTextTimer = 0.0f;
+    int score = 0;
+
     b2Vec2 respawnPosition =
         b2Vec2{ 0.0f, -7.0f };
 
@@ -1542,6 +1565,26 @@ int main(int argc, char* argv[])
             / 1000000000.0f;
 
         previousTime = currentTime;
+
+
+        // ---------------------------------------------
+        // STUNT POPUP TIMER
+        // ---------------------------------------------
+
+        if (stuntTextTimer > 0.0f)
+        {
+            stuntTextTimer -= deltaTime;
+
+            if (stuntTextTimer < 0.0f)
+            {
+                stuntTextTimer = 0.0f;
+            }
+        }
+
+
+        // ---------------------------------------------
+        // LEVEL TIMER
+        // ---------------------------------------------
 
         if (!levelComplete)
         {
@@ -1776,12 +1819,32 @@ int main(int argc, char* argv[])
 
                     if (positiveFlipCompleted)
                     {
-                        SDL_Log("FULL FLIP - POSITIVE");
+                        SDL_Log("FRONT FLIP DETECTED");
+
+                        score += 500;
+
+                        SDL_snprintf(
+                            stuntText,
+                            sizeof(stuntText),
+                            "FRONT FLIP! +500"
+                        );
+
+                        stuntTextTimer = 1.2f;
                     }
 
                     if (negativeFlipCompleted)
                     {
-                        SDL_Log("FULL FLIP - NEGATIVE");
+                        SDL_Log("BACKFLIP DETECTED");
+
+                        score += 500;
+
+                        SDL_snprintf(
+                            stuntText,
+                            sizeof(stuntText),
+                            "BACKFLIP! +500"
+                        );
+
+                        stuntTextTimer = 1.2f;
                     }
 
                     airTime = 0.0f;
@@ -1974,6 +2037,8 @@ int main(int argc, char* argv[])
             checkpointReached,
             levelTime,
             airTime,
+            stuntText,
+            stuntTextTimer,
             bestTime,
             newBestTime
         );
