@@ -1245,7 +1245,7 @@ void Render(
     SDL_FRect bikeRect;
 
     bikeRect.w = 145.0f;
-    bikeRect.h = 48.0f;
+    bikeRect.h = 70.0f;
 
     bikeRect.x =
         chassisScreenX -
@@ -1324,8 +1324,7 @@ void Render(
 
     frontWheelRect.x =
         frontWheelScreen.x -
-        frontWheelRect.w / 2.0f +
-        10.0f;
+        frontWheelRect.w / 2.0f;
 
     frontWheelRect.y =
         frontWheelScreen.y -
@@ -1443,7 +1442,7 @@ int main(int argc, char* argv[])
     SDL_Texture* bikeTexture =
         IMG_LoadTexture(
             renderer,
-            "assets/Bike/bike_chassis.png"
+            "assets/Bike/rider_chassis.png"
         );
 
     SDL_Texture* wheelTexture =
