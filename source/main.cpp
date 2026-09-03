@@ -34,13 +34,24 @@ void ProcessInput(
     bool& running,
     InputState& input)
 {
+
     SDL_Event event;
+
+    input.jumpPressed = false;
 
     while (SDL_PollEvent(&event))
     {
         if (event.type == SDL_EVENT_QUIT)
         {
             running = false;
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN)
+        {
+            if (event.key.scancode == SDL_SCANCODE_SPACE &&
+                !event.key.repeat)
+            {
+                input.jumpPressed = true;
+            }
         }
     }
 
@@ -61,6 +72,7 @@ void ProcessInput(
 
     input.resetPressed =
         keyboardState[SDL_SCANCODE_R];
+
 }
 
 // ---------------------------------------------------------
@@ -336,8 +348,13 @@ void DrawText(
 void DrawUI(
     SDL_Renderer* renderer,
     TTF_Font* font,
+    TTF_Font* stuntFont,
     bool levelComplete,
     float levelTime,
+    float airTime,
+    const char* stuntText,
+    float stuntTextTimer,
+    int score,
     float bestTime,
     bool newBestTime)
 {
@@ -356,6 +373,24 @@ void DrawUI(
         "Time: %02d:%05.2f",
         minutes,
         seconds
+    );
+
+    char airTimeText[64];
+
+    SDL_snprintf(
+        airTimeText,
+        sizeof(airTimeText),
+        "Air Time: %.2f",
+        airTime
+    );
+
+    char scoreText[64];
+
+    SDL_snprintf(
+        scoreText,
+        sizeof(scoreText),
+        "Score: %d",
+        score
     );
 
     SDL_Color white =
@@ -404,6 +439,28 @@ void DrawUI(
             25.0f,
             white
         );
+
+        DrawText(
+            renderer,
+            font,
+            scoreText,
+            SCREEN_WIDTH - 180.0f,
+            55.0f,
+            white
+        );
+
+        if (airTime > 0.0f)
+        {
+            DrawText(
+                renderer,
+                font,
+                airTimeText,
+                SCREEN_WIDTH / 2.0f - 80.0f,
+                40.0f,
+                white
+            );
+        }
+        
     }
     else
     {
@@ -490,6 +547,18 @@ void DrawUI(
             white
         );
     }
+
+    if (stuntTextTimer > 0.0f)
+    {
+        DrawText(
+            renderer,
+            stuntFont,
+            stuntText,
+            SCREEN_WIDTH / 2.0f - 100.0f,
+            80.0f,
+            white
+        );
+    }
 }
 
 void DrawCheckpoint(
@@ -565,6 +634,7 @@ void DrawCheckpoint(
 void Render(
     SDL_Renderer* renderer,
     TTF_Font* font,
+    TTF_Font* stuntFont,
     SDL_Texture* bikeTexture,
     SDL_Texture* wheelTexture,
     b2BodyId chassisBodyId,
@@ -578,6 +648,10 @@ void Render(
     bool levelComplete,
     bool checkpointReached,
     float levelTime,
+    float airTime,
+    const char* stuntText,
+    float stuntTextTimer,
+    int score,
     float bestTime,
     bool newBestTime)
 {
@@ -1209,164 +1283,67 @@ void Render(
         cameraX,
         checkpointReached
     );
+
+    // =====================================================
+// SIMPLE BIKE DEBUG VISUALS
 // =====================================================
-// BIKE CHASSIS SPRITE
-// =====================================================
 
-    b2Vec2 chassisPosition =
-        b2Body_GetPosition(chassisBodyId);
-
-    b2Rot chassisRotation =
-        b2Body_GetRotation(chassisBodyId);
-
-    float chassisAngleRadians =
-        b2Rot_GetAngle(chassisRotation);
-
-    double chassisAngleDegrees =
-        chassisAngleRadians *
-        180.0 /
-        3.14159265;
-
-
-    // Convert Box2D position -> SDL screen.
-    float chassisScreenX =
-        CAMERA_TARGET_X +
-        (chassisPosition.x - cameraX) *
-        PIXELS_PER_METER;
-
-    float chassisScreenY =
-        SCREEN_CENTER_Y -
-        chassisPosition.y *
-        PIXELS_PER_METER;
-
-
-    // Size of visual bike sprite.
-    // We will tune these after seeing it.
-    SDL_FRect bikeRect;
-
-    bikeRect.w = 145.0f;
-    bikeRect.h = 70.0f;
-
-    bikeRect.x =
-        chassisScreenX -
-        bikeRect.w / 2.0f;
-
-    bikeRect.y =
-        chassisScreenY -
-        bikeRect.h / 2.0f;
-
-
-    SDL_RenderTextureRotated(
+// Draw physics chassis.
+    DrawRotatedChassis(
         renderer,
-        bikeTexture,
-        nullptr,
-        &bikeRect,
-        -chassisAngleDegrees,
-        nullptr,
-        SDL_FLIP_NONE
+        chassisBodyId,
+        cameraX
     );
 
-    // =====================================================
-    // WHEEL SPRITES
-    // =====================================================
 
-    const float wheelDiameter =
+    // Wheel size based directly on Box2D physics.
+    const float wheelRadiusPixels =
         BIKE_WHEEL_RADIUS *
-        2.0f *
-        PIXELS_PER_METER *
-        1.6f;
+        PIXELS_PER_METER;
 
 
-    // Rear wheel rotation.
-    float rearWheelAngleRadians =
-        b2Rot_GetAngle(
-            b2Body_GetRotation(rearWheelBodyId)
-        );
-
-    double rearWheelAngleDegrees =
-        rearWheelAngleRadians *
-        180.0 /
-        3.14159265;
-
-
-    // Front wheel rotation.
-    float frontWheelAngleRadians =
-        b2Rot_GetAngle(
-            b2Body_GetRotation(frontWheelBodyId)
-        );
-
-    double frontWheelAngleDegrees =
-        frontWheelAngleRadians *
-        180.0 /
-        3.14159265;
-
-
-    // Rear wheel rectangle.
-    SDL_FRect rearWheelRect;
-
-    rearWheelRect.w = wheelDiameter;
-    rearWheelRect.h = wheelDiameter;
-
-    rearWheelRect.x =
-        rearWheelScreen.x -
-        rearWheelRect.w / 2.0f;
-
-    rearWheelRect.y =
-        rearWheelScreen.y -
-        rearWheelRect.h / 2.0f;
-
-
-    // Front wheel rectangle.
-    SDL_FRect frontWheelRect;
-
-    frontWheelRect.w = wheelDiameter;
-    frontWheelRect.h = wheelDiameter;
-
-    frontWheelRect.x =
-        frontWheelScreen.x -
-        frontWheelRect.w / 2.0f;
-
-    frontWheelRect.y =
-        frontWheelScreen.y -
-        frontWheelRect.h / 2.0f -
-        1.0f;
-
-
-    // Draw rear wheel.
-    SDL_RenderTextureRotated(
+    // Rear wheel.
+    SDL_SetRenderDrawColor(
         renderer,
-        wheelTexture,
-        nullptr,
-        &rearWheelRect,
-        -rearWheelAngleDegrees,
-        nullptr,
-        SDL_FLIP_NONE
+        30,
+        30,
+        30,
+        255
+    );
+
+    DrawFilledCircle(
+        renderer,
+        rearWheelScreen.x,
+        rearWheelScreen.y,
+        wheelRadiusPixels
     );
 
 
-    // Draw front wheel.
-    SDL_RenderTextureRotated(
+    // Front wheel.
+    DrawFilledCircle(
         renderer,
-        wheelTexture,
-        nullptr,
-        &frontWheelRect,
-        -frontWheelAngleDegrees,
-        nullptr,
-        SDL_FLIP_NONE
+        frontWheelScreen.x,
+        frontWheelScreen.y,
+        wheelRadiusPixels
     );
 
     // =====================================================
-// UI
-// =====================================================
+    // UI
+    // =====================================================
 
 
     DrawUI(
         renderer,
         font,
+        stuntFont,
         levelComplete,
         levelTime,
-		bestTime,
-		newBestTime
+        airTime,
+        stuntText,
+        stuntTextTimer,
+        score,
+        bestTime,
+        newBestTime
     );
 
     // =====================================================
@@ -1495,9 +1472,16 @@ int main(int argc, char* argv[])
 
     TTF_Font* font =
         TTF_OpenFont(
-            "C:/Windows/Fonts/arial.ttf",
-            24.0f
+            "assets/Fonts/Bangers-Regular.ttf",
+            28.0f
         );
+
+    TTF_Font* stuntFont =
+        TTF_OpenFont(
+            "assets/Fonts/Bangers-Regular.ttf",
+            48.0f
+        );
+        
 
     if (!font)
     {
@@ -1565,16 +1549,30 @@ int main(int argc, char* argv[])
     InputState input;
 
     bool bikeGrounded = true;
-
+    
     bool levelComplete = false; 
 
     bool checkpointReached = false;
 
     float levelTime = 0.0f;
 
+    float airTime = 0.0f;
+    bool wasBikeGrounded = true;
+
+    float previousBikeAngle = 0.0f;
+    float accumulatedRotation = 0.0f;
+
+    bool positiveFlipCompleted = false;
+    bool negativeFlipCompleted = false;
+    int flipCount = 0;
+
     // No best time exists yet so -1
     float bestTime = -1.0f;
     bool newBestTime = false;
+
+    char stuntText[64] = "";
+    float stuntTextTimer = 0.0f;
+    int score = 0;
 
     b2Vec2 respawnPosition =
         b2Vec2{ 0.0f, -7.0f };
@@ -1599,6 +1597,26 @@ int main(int argc, char* argv[])
             / 1000000000.0f;
 
         previousTime = currentTime;
+
+
+        // ---------------------------------------------
+        // STUNT POPUP TIMER
+        // ---------------------------------------------
+
+        if (stuntTextTimer > 0.0f)
+        {
+            stuntTextTimer -= deltaTime;
+
+            if (stuntTextTimer < 0.0f)
+            {
+                stuntTextTimer = 0.0f;
+            }
+        }
+
+
+        // ---------------------------------------------
+        // LEVEL TIMER
+        // ---------------------------------------------
 
         if (!levelComplete)
         {
@@ -1639,6 +1657,9 @@ int main(int argc, char* argv[])
             bikeGrounded = true;
 
             levelComplete = false;
+
+            airTime = 0.0f;
+            wasBikeGrounded = true;
         }
 
 
@@ -1658,6 +1679,58 @@ int main(int argc, char* argv[])
             );
 
             // ---------------------------------------------
+            // BUNNY HOP
+            // ---------------------------------------------
+
+            const float jumpVelocityChange = 3.5f;
+
+            if (input.jumpPressed &&
+                bikeGrounded &&
+                !levelComplete)
+            {
+                // Get each body's mass.
+                const float chassisMass =
+                    b2Body_GetMass(bike.chassisBodyId);
+
+                const float rearWheelMass =
+                    b2Body_GetMass(bike.rearWheelBodyId);
+
+                const float frontWheelMass =
+                    b2Body_GetMass(bike.frontWheelBodyId);
+
+
+                // Give every part of the bike the same
+                // upward velocity change.
+                b2Body_ApplyLinearImpulseToCenter(
+                    bike.chassisBodyId,
+                    b2Vec2{
+                        0.0f,
+                        chassisMass * jumpVelocityChange
+                    },
+                    true
+                );
+
+                b2Body_ApplyLinearImpulseToCenter(
+                    bike.rearWheelBodyId,
+                    b2Vec2{
+                        0.0f,
+                        rearWheelMass * jumpVelocityChange
+                    },
+                    true
+                );
+
+                b2Body_ApplyLinearImpulseToCenter(
+                    bike.frontWheelBodyId,
+                    b2Vec2{
+                        0.0f,
+                        frontWheelMass * jumpVelocityChange
+                    },
+                    true
+                );
+
+            }
+
+            // ---------------------------------------------
             // RUN BOX2D
             // ---------------------------------------------
 
@@ -1669,6 +1742,161 @@ int main(int argc, char* argv[])
 
             bikeGrounded =
                 IsBikeGrounded(bike);
+
+            bool justLeftGround =
+                wasBikeGrounded &&
+                !bikeGrounded;
+
+            bool justLanded =
+                !wasBikeGrounded &&
+                bikeGrounded;
+            if (justLeftGround)
+            {
+                SDL_Log("LEFT GROUND");
+            }
+
+            if (justLanded)
+            {
+                SDL_Log(
+                    "LANDED | AirTime: %.2f | Rotation: %.2f",
+                    airTime,
+                    accumulatedRotation
+                );
+            }
+
+            float currentBikeAngle =
+                b2Rot_GetAngle(
+                    b2Body_GetRotation(
+                        bike.chassisBodyId
+                    )
+                );
+
+            if (justLeftGround)
+            {
+                accumulatedRotation = 0.0f;
+                previousBikeAngle = currentBikeAngle;
+
+                positiveFlipCompleted = false;
+                negativeFlipCompleted = false;
+
+                flipCount = 0;
+            }
+            if (!bikeGrounded)
+            {
+                float angleDifference =
+                    currentBikeAngle -
+                    previousBikeAngle;
+
+                constexpr float PI =
+                    3.14159265f;
+
+                // Fix angle wrap from +PI to -PI.
+                if (angleDifference > PI)
+                {
+                    angleDifference -=
+                        2.0f * PI;
+                }
+
+                if (angleDifference < -PI)
+                {
+                    angleDifference +=
+                        2.0f * PI;
+                }
+
+                accumulatedRotation +=
+                    angleDifference;
+
+                constexpr float FLIP_THRESHOLD = 5.5f;
+
+                if (accumulatedRotation >= FLIP_THRESHOLD)
+                {
+                    positiveFlipCompleted = true;
+                }
+
+                if (accumulatedRotation <= -FLIP_THRESHOLD)
+                {
+                    negativeFlipCompleted = true;
+                }
+
+                previousBikeAngle =
+                    currentBikeAngle;
+            }
+            // ---------------------------------------------
+            // AIR TIME
+            // ---------------------------------------------
+
+            if (!bikeGrounded)
+            {
+                airTime += physicsTimeStep;
+            }
+
+            if (!wasBikeGrounded && bikeGrounded)
+            {
+                // =========================
+                // AIR TIME LANDING
+                // =========================
+
+                if (airTime >= 0.5f)
+                {
+                    SDL_Log(
+                        "AIR TIME: %.2f seconds",
+                        airTime
+                    );
+                }
+                if (justLanded)
+                {
+                    SDL_Log(
+                        "LANDED | AirTime: %.2f | Rotation: %.2f",
+                        airTime,
+                        accumulatedRotation
+                    );
+
+                    if (positiveFlipCompleted)
+                    {
+                        score += 500;
+
+                        SDL_Log(
+                            "FRONT FLIP DETECTED | SCORE: %d",
+                            score
+                        );
+
+                        SDL_snprintf(
+                            stuntText,
+                            sizeof(stuntText),
+                            "FRONT FLIP! +500"
+                        );
+
+                        stuntTextTimer = 1.2f;
+                    }
+
+                    if (negativeFlipCompleted)
+                    {
+                        score += 500;
+
+                        SDL_Log(
+                            "BACKFLIP DETECTED | SCORE: %d",
+                            score
+                        );
+
+                        SDL_snprintf(
+                            stuntText,
+                            sizeof(stuntText),
+                            "BACKFLIP! +500"
+                        );
+
+                        stuntTextTimer = 1.2f;
+                    }
+
+                    airTime = 0.0f;
+                    accumulatedRotation = 0.0f;
+                }
+
+                // Reset jump data.
+                airTime = 0.0f;
+                accumulatedRotation = 0.0f;
+            }
+
+            wasBikeGrounded = bikeGrounded;
 
             if (levelComplete)
             {
@@ -1835,6 +2063,7 @@ int main(int argc, char* argv[])
         Render(
             renderer,
             font,
+            stuntFont,
             bikeTexture,
             wheelTexture,
             bike.chassisBodyId,
@@ -1848,6 +2077,10 @@ int main(int argc, char* argv[])
             levelComplete,
             checkpointReached,
             levelTime,
+            airTime,
+            stuntText,
+            stuntTextTimer,
+            score,
             bestTime,
             newBestTime
         );
