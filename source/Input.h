@@ -9,4 +9,6 @@ struct InputState
     bool leanForward = false;
 
     bool resetPressed = false;
+
+    bool jumpPressed = false;
 };

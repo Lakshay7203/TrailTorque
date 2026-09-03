@@ -34,13 +34,24 @@ void ProcessInput(
     bool& running,
     InputState& input)
 {
+
     SDL_Event event;
+
+    input.jumpPressed = false;
 
     while (SDL_PollEvent(&event))
     {
         if (event.type == SDL_EVENT_QUIT)
         {
             running = false;
+        }
+        if (event.type == SDL_EVENT_KEY_DOWN)
+        {
+            if (event.key.scancode == SDL_SCANCODE_SPACE &&
+                !event.key.repeat)
+            {
+                input.jumpPressed = true;
+            }
         }
     }
 
@@ -61,6 +72,7 @@ void ProcessInput(
 
     input.resetPressed =
         keyboardState[SDL_SCANCODE_R];
+
 }
 
 // ---------------------------------------------------------
@@ -1209,155 +1221,53 @@ void Render(
         cameraX,
         checkpointReached
     );
+
+    // =====================================================
+// SIMPLE BIKE DEBUG VISUALS
 // =====================================================
-// BIKE CHASSIS SPRITE
-// =====================================================
 
-    b2Vec2 chassisPosition =
-        b2Body_GetPosition(chassisBodyId);
-
-    b2Rot chassisRotation =
-        b2Body_GetRotation(chassisBodyId);
-
-    float chassisAngleRadians =
-        b2Rot_GetAngle(chassisRotation);
-
-    double chassisAngleDegrees =
-        chassisAngleRadians *
-        180.0 /
-        3.14159265;
-
-
-    // Convert Box2D position -> SDL screen.
-    float chassisScreenX =
-        CAMERA_TARGET_X +
-        (chassisPosition.x - cameraX) *
-        PIXELS_PER_METER;
-
-    float chassisScreenY =
-        SCREEN_CENTER_Y -
-        chassisPosition.y *
-        PIXELS_PER_METER;
-
-
-    // Size of visual bike sprite.
-    // We will tune these after seeing it.
-    SDL_FRect bikeRect;
-
-    bikeRect.w = 145.0f;
-    bikeRect.h = 70.0f;
-
-    bikeRect.x =
-        chassisScreenX -
-        bikeRect.w / 2.0f;
-
-    bikeRect.y =
-        chassisScreenY -
-        bikeRect.h / 2.0f;
-
-
-    SDL_RenderTextureRotated(
+// Draw physics chassis.
+    DrawRotatedChassis(
         renderer,
-        bikeTexture,
-        nullptr,
-        &bikeRect,
-        -chassisAngleDegrees,
-        nullptr,
-        SDL_FLIP_NONE
+        chassisBodyId,
+        cameraX
     );
 
-    // =====================================================
-    // WHEEL SPRITES
-    // =====================================================
 
-    const float wheelDiameter =
+    // Wheel size based directly on Box2D physics.
+    const float wheelRadiusPixels =
         BIKE_WHEEL_RADIUS *
-        2.0f *
-        PIXELS_PER_METER *
-        1.6f;
+        PIXELS_PER_METER;
 
 
-    // Rear wheel rotation.
-    float rearWheelAngleRadians =
-        b2Rot_GetAngle(
-            b2Body_GetRotation(rearWheelBodyId)
-        );
-
-    double rearWheelAngleDegrees =
-        rearWheelAngleRadians *
-        180.0 /
-        3.14159265;
-
-
-    // Front wheel rotation.
-    float frontWheelAngleRadians =
-        b2Rot_GetAngle(
-            b2Body_GetRotation(frontWheelBodyId)
-        );
-
-    double frontWheelAngleDegrees =
-        frontWheelAngleRadians *
-        180.0 /
-        3.14159265;
-
-
-    // Rear wheel rectangle.
-    SDL_FRect rearWheelRect;
-
-    rearWheelRect.w = wheelDiameter;
-    rearWheelRect.h = wheelDiameter;
-
-    rearWheelRect.x =
-        rearWheelScreen.x -
-        rearWheelRect.w / 2.0f;
-
-    rearWheelRect.y =
-        rearWheelScreen.y -
-        rearWheelRect.h / 2.0f;
-
-
-    // Front wheel rectangle.
-    SDL_FRect frontWheelRect;
-
-    frontWheelRect.w = wheelDiameter;
-    frontWheelRect.h = wheelDiameter;
-
-    frontWheelRect.x =
-        frontWheelScreen.x -
-        frontWheelRect.w / 2.0f;
-
-    frontWheelRect.y =
-        frontWheelScreen.y -
-        frontWheelRect.h / 2.0f -
-        1.0f;
-
-
-    // Draw rear wheel.
-    SDL_RenderTextureRotated(
+    // Rear wheel.
+    SDL_SetRenderDrawColor(
         renderer,
-        wheelTexture,
-        nullptr,
-        &rearWheelRect,
-        -rearWheelAngleDegrees,
-        nullptr,
-        SDL_FLIP_NONE
+        30,
+        30,
+        30,
+        255
+    );
+
+    DrawFilledCircle(
+        renderer,
+        rearWheelScreen.x,
+        rearWheelScreen.y,
+        wheelRadiusPixels
     );
 
 
-    // Draw front wheel.
-    SDL_RenderTextureRotated(
+    // Front wheel.
+    DrawFilledCircle(
         renderer,
-        wheelTexture,
-        nullptr,
-        &frontWheelRect,
-        -frontWheelAngleDegrees,
-        nullptr,
-        SDL_FLIP_NONE
+        frontWheelScreen.x,
+        frontWheelScreen.y,
+        wheelRadiusPixels
     );
 
     // =====================================================
-// UI
-// =====================================================
+    // UI
+    // =====================================================
 
 
     DrawUI(
@@ -1565,7 +1475,7 @@ int main(int argc, char* argv[])
     InputState input;
 
     bool bikeGrounded = true;
-
+    
     bool levelComplete = false; 
 
     bool checkpointReached = false;
@@ -1656,6 +1566,58 @@ int main(int argc, char* argv[])
                 bikeGrounded,
                 levelComplete
             );
+
+            // ---------------------------------------------
+            // BUNNY HOP
+            // ---------------------------------------------
+
+            const float jumpVelocityChange = 3.5f;
+
+            if (input.jumpPressed &&
+                bikeGrounded &&
+                !levelComplete)
+            {
+                // Get each body's mass.
+                const float chassisMass =
+                    b2Body_GetMass(bike.chassisBodyId);
+
+                const float rearWheelMass =
+                    b2Body_GetMass(bike.rearWheelBodyId);
+
+                const float frontWheelMass =
+                    b2Body_GetMass(bike.frontWheelBodyId);
+
+
+                // Give every part of the bike the same
+                // upward velocity change.
+                b2Body_ApplyLinearImpulseToCenter(
+                    bike.chassisBodyId,
+                    b2Vec2{
+                        0.0f,
+                        chassisMass * jumpVelocityChange
+                    },
+                    true
+                );
+
+                b2Body_ApplyLinearImpulseToCenter(
+                    bike.rearWheelBodyId,
+                    b2Vec2{
+                        0.0f,
+                        rearWheelMass * jumpVelocityChange
+                    },
+                    true
+                );
+
+                b2Body_ApplyLinearImpulseToCenter(
+                    bike.frontWheelBodyId,
+                    b2Vec2{
+                        0.0f,
+                        frontWheelMass * jumpVelocityChange
+                    },
+                    true
+                );
+
+            }
 
             // ---------------------------------------------
             // RUN BOX2D
