@@ -3,7 +3,7 @@
 #include <box2d/box2d.h>
 #include <vector>
 
-inline constexpr float TERRAIN_GROUND_HALF_WIDTH = 100.0f;
+inline constexpr float TERRAIN_GROUND_HALF_WIDTH = 400.0f;
 inline constexpr float TERRAIN_GROUND_HEIGHT = 2.0f;
 
 struct TerrainSegment

@@ -24,11 +24,14 @@ constexpr float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0f;
 
 constexpr float CAMERA_TARGET_X = 400.0f;
 
-constexpr float GROUND_HALF_WIDTH = 100.0f;
+constexpr float GROUND_HALF_WIDTH = 400.0f;
 constexpr float GROUND_HEIGHT = 2.0f;
 
-constexpr float FINISH_X = 90.0f;
-constexpr float CHECKPOINT_X = 35.0f;
+constexpr float FINISH_X = 315.0f;
+constexpr float CHECKPOINT_X = 155.0f;
+
+
+
 
 void ProcessInput(
     bool& running,
@@ -572,10 +575,9 @@ void DrawCheckpoint(
         (CHECKPOINT_X - cameraX) *
         PIXELS_PER_METER;
 
-    // Ground surface is y = -9 in Box2D.
-    const float groundScreenY =
+    const float checkpointGroundY =
         SCREEN_CENTER_Y -
-        (-9.0f * PIXELS_PER_METER);
+        (-4.0f * PIXELS_PER_METER);
 
     // Yellow before reaching it, green afterwards.
     if (checkpointReached)
@@ -602,7 +604,7 @@ void DrawCheckpoint(
     SDL_FRect pole =
     {
         checkpointScreenX,
-        groundScreenY - 110.0f,
+        checkpointGroundY - 110.0f,
         6.0f,
         110.0f
     };
@@ -616,7 +618,7 @@ void DrawCheckpoint(
     SDL_FRect flag =
     {
         checkpointScreenX + 6.0f,
-        groundScreenY - 110.0f,
+        checkpointGroundY - 110.0f,
         55.0f,
         30.0f
     };
@@ -624,6 +626,195 @@ void DrawCheckpoint(
     SDL_RenderFillRect(
         renderer,
         &flag
+    );
+}
+
+void DrawWheelSprite(
+    SDL_Renderer* renderer,
+    SDL_Texture* wheelTexture,
+    b2BodyId wheelBodyId,
+    const SDL_FPoint& wheelScreen)
+{
+    float wheelAngleRadians =
+        b2Rot_GetAngle(
+            b2Body_GetRotation(wheelBodyId)
+        );
+
+    constexpr float RAD_TO_DEG =
+        57.2957795f;
+
+    float wheelAngleDegrees =
+        -wheelAngleRadians * RAD_TO_DEG;
+
+    // Physical Box2D wheel diameter.
+    float physicsDiameter =
+        BIKE_WHEEL_RADIUS *
+        2.0f *
+        PIXELS_PER_METER;
+
+    // Compensates for transparent padding around our PNG.
+    constexpr float WHEEL_VISUAL_SCALE = 1.8f;
+
+    float wheelSize =
+        physicsDiameter *
+        WHEEL_VISUAL_SCALE;
+
+    SDL_FRect wheelRect =
+    {
+        wheelScreen.x - wheelSize / 2.0f,
+        wheelScreen.y - wheelSize / 2.0f,
+        wheelSize,
+        wheelSize
+    };
+
+    SDL_RenderTextureRotated(
+        renderer,
+        wheelTexture,
+        nullptr,
+        &wheelRect,
+        wheelAngleDegrees,
+        nullptr,
+        SDL_FLIP_NONE
+    );
+}
+
+void DrawBikeSprite(
+    SDL_Renderer* renderer,
+    SDL_Texture* bikeTexture,
+    const SDL_FPoint& rearWheelScreen,
+    const SDL_FPoint& frontWheelScreen)
+{
+    constexpr float RAD_TO_DEG =
+        57.2957795f;
+
+    // Dimensions of our generated rider_chassis.png.
+    constexpr float ART_WIDTH = 1536.0f;
+    constexpr float ART_HEIGHT = 1024.0f;
+
+    // Axle-hole positions inside the PNG.
+    constexpr float REAR_AXLE_X = 220.0f;
+    constexpr float REAR_AXLE_Y = 854.0f;
+
+    constexpr float FRONT_AXLE_X = 1258.0f;
+    constexpr float FRONT_AXLE_Y = 913.0f;
+
+    // -------------------------------------------------
+    // DISTANCE BETWEEN PHYSICS WHEELS
+    // -------------------------------------------------
+
+    float screenDX =
+        frontWheelScreen.x -
+        rearWheelScreen.x;
+
+    float screenDY =
+        frontWheelScreen.y -
+        rearWheelScreen.y;
+
+    float screenWheelDistance =
+        std::sqrt(
+            screenDX * screenDX +
+            screenDY * screenDY
+        );
+
+    // -------------------------------------------------
+    // DISTANCE BETWEEN AXLE HOLES IN ARTWORK
+    // -------------------------------------------------
+
+    float artDX =
+        FRONT_AXLE_X -
+        REAR_AXLE_X;
+
+    float artDY =
+        FRONT_AXLE_Y -
+        REAR_AXLE_Y;
+
+    float artWheelDistance =
+        std::sqrt(
+            artDX * artDX +
+            artDY * artDY
+        );
+
+    float scale =
+        screenWheelDistance /
+        artWheelDistance;
+
+    // -------------------------------------------------
+    // SIZE THE COMPLETE RIDER SPRITE
+    // -------------------------------------------------
+
+    SDL_FRect bikeRect;
+
+    bikeRect.w =
+        ART_WIDTH * scale;
+
+    bikeRect.h =
+        ART_HEIGHT * scale;
+
+    // -------------------------------------------------
+    // MIDPOINT BETWEEN THE TWO AXLES
+    // -------------------------------------------------
+
+    float artMidX =
+        (REAR_AXLE_X + FRONT_AXLE_X)
+        / 2.0f;
+
+    float artMidY =
+        (REAR_AXLE_Y + FRONT_AXLE_Y)
+        / 2.0f;
+
+    float screenMidX =
+        (rearWheelScreen.x +
+            frontWheelScreen.x)
+        / 2.0f;
+
+    float screenMidY =
+        (rearWheelScreen.y +
+            frontWheelScreen.y)
+        / 2.0f;
+
+    // Pivot inside destination rectangle.
+    SDL_FPoint pivot =
+    {
+        artMidX * scale,
+        artMidY * scale
+    };
+
+    bikeRect.x =
+        screenMidX -
+        pivot.x;
+
+    bikeRect.y =
+        screenMidY -
+        pivot.y;
+
+    // -------------------------------------------------
+    // MATCH ART ANGLE TO PHYSICS WHEEL ANGLE
+    // -------------------------------------------------
+
+    float screenAngle =
+        std::atan2(
+            screenDY,
+            screenDX
+        ) * RAD_TO_DEG;
+
+    float artAngle =
+        std::atan2(
+            artDY,
+            artDX
+        ) * RAD_TO_DEG;
+
+    float finalAngle =
+        screenAngle -
+        artAngle;
+
+    SDL_RenderTextureRotated(
+        renderer,
+        bikeTexture,
+        nullptr,
+        &bikeRect,
+        finalAngle,
+        &pivot,
+        SDL_FLIP_NONE
     );
 }
 
@@ -1285,46 +1476,202 @@ void Render(
     );
 
     // =====================================================
-// SIMPLE BIKE DEBUG VISUALS
-// =====================================================
+    // NEW BIKE VISUALS
+    // =====================================================
 
-// Draw physics chassis.
-    DrawRotatedChassis(
-        renderer,
-        chassisBodyId,
-        cameraX
-    );
+    b2Vec2 chassisPosition =
+        b2Body_GetPosition(chassisBodyId);
 
+    float chassisAngle =
+        b2Rot_GetAngle(
+            b2Body_GetRotation(chassisBodyId)
+        );
 
-    // Wheel size based directly on Box2D physics.
-    const float wheelRadiusPixels =
-        BIKE_WHEEL_RADIUS *
+    float chassisScreenX =
+        CAMERA_TARGET_X +
+        (chassisPosition.x - cameraX) *
         PIXELS_PER_METER;
 
+    float chassisScreenY =
+        SCREEN_CENTER_Y -
+        chassisPosition.y *
+        PIXELS_PER_METER;
 
-    // Rear wheel.
-    SDL_SetRenderDrawColor(
+    const float BIKE_VISUAL_OFFSET_Y = 18.0f;
+
+    float visualChassisScreenY =
+        chassisScreenY + BIKE_VISUAL_OFFSET_Y;
+
+
+    // =====================================================
+// RIDER + FRAME - ALIGN TO REAL WHEEL CENTERS
+// =====================================================
+
+    constexpr float ART_WIDTH = 1448.0f;
+    constexpr float ART_HEIGHT = 1086.0f;
+
+    // Axle-hole centers in rider_chassis.png.
+    constexpr float REAR_AXLE_X = 249.0f;
+    constexpr float REAR_AXLE_Y = 889.0f;
+
+    constexpr float FRONT_AXLE_X = 1208.0f;
+    constexpr float FRONT_AXLE_Y = 946.0f;
+
+    constexpr float RAD_TO_DEG = 57.2957795f;
+
+
+    // Distance/angle between axle holes in the PNG.
+    float artDX =
+        FRONT_AXLE_X - REAR_AXLE_X;
+
+    float artDY =
+        FRONT_AXLE_Y - REAR_AXLE_Y;
+
+    float artDistance =
+        std::sqrt(
+            artDX * artDX +
+            artDY * artDY
+        );
+
+    float artAngle =
+        std::atan2(
+            artDY,
+            artDX
+        ) * RAD_TO_DEG;
+
+
+    // Distance/angle between REAL Box2D wheels.
+    float screenDX =
+        frontWheelScreen.x -
+        rearWheelScreen.x;
+
+    float screenDY =
+        frontWheelScreen.y -
+        rearWheelScreen.y;
+
+    float screenDistance =
+        std::sqrt(
+            screenDX * screenDX +
+            screenDY * screenDY
+        );
+
+    float screenAngle =
+        std::atan2(
+            screenDY,
+            screenDX
+        ) * RAD_TO_DEG;
+
+
+    // Scale body so axle-hole distance matches physics wheel distance.
+    float bikeScale =
+        screenDistance /
+        artDistance;
+
+
+    // Size of rendered rider/body.
+    SDL_FRect bikeRect;
+
+    bikeRect.w =
+        ART_WIDTH * bikeScale;
+
+    constexpr float RIDER_HEIGHT_SCALE = 1.2f;
+
+    bikeRect.h =
+        ART_HEIGHT *
+        bikeScale *
+        RIDER_HEIGHT_SCALE;
+
+
+    // Use REAR axle hole as the rotation pivot.
+    SDL_FPoint bikePivot =
+    {
+        REAR_AXLE_X * bikeScale,
+        REAR_AXLE_Y * bikeScale
+    };
+
+
+    // Put rear axle hole EXACTLY on rear Box2D wheel center.
+    bikeRect.x =
+        rearWheelScreen.x -
+        bikePivot.x;
+
+    bikeRect.y =
+        rearWheelScreen.y -
+        bikePivot.y;
+
+
+    // Rotate artwork so front axle also lands on front wheel.
+    float bikeVisualAngle =
+        screenAngle -
+        artAngle;
+
+
+    SDL_RenderTextureRotated(
         renderer,
-        30,
-        30,
-        30,
-        255
+        bikeTexture,
+        nullptr,
+        &bikeRect,
+        bikeVisualAngle,
+        &bikePivot,
+        SDL_FLIP_NONE
     );
 
-    DrawFilledCircle(
+
+    // ------------------------------
+    // WHEELS
+    // ------------------------------
+
+    const float wheelSize = 50.0f;
+
+    const float rearWheelOffsetX = -3.0f;
+    const float frontWheelOffsetX = 4.0f;
+
+    const float wheelOffsetY = -2.0f;
+
+    SDL_FRect rearWheelRect =
+    {
+        rearWheelScreen.x - wheelSize / 2.0f,
+        rearWheelScreen.y - wheelSize / 2.0f,
+        wheelSize,
+        wheelSize
+    };
+
+    SDL_FRect frontWheelRect =
+    {
+        frontWheelScreen.x - wheelSize / 2.0f,
+        frontWheelScreen.y - wheelSize / 2.0f,
+        wheelSize,
+        wheelSize
+    };
+
+    float rearAngle =
+        -b2Rot_GetAngle(
+            b2Body_GetRotation(rearWheelBodyId)
+        ) * 57.2957795f;
+
+    float frontAngle =
+        -b2Rot_GetAngle(
+            b2Body_GetRotation(frontWheelBodyId)
+        ) * 57.2957795f;
+
+    SDL_RenderTextureRotated(
         renderer,
-        rearWheelScreen.x,
-        rearWheelScreen.y,
-        wheelRadiusPixels
+        wheelTexture,
+        nullptr,
+        &rearWheelRect,
+        rearAngle,
+        nullptr,
+        SDL_FLIP_NONE
     );
 
-
-    // Front wheel.
-    DrawFilledCircle(
+    SDL_RenderTextureRotated(
         renderer,
-        frontWheelScreen.x,
-        frontWheelScreen.y,
-        wheelRadiusPixels
+        wheelTexture,
+        nullptr,
+        &frontWheelRect,
+        frontAngle,
+        nullptr,
+        SDL_FLIP_NONE
     );
 
     // =====================================================
@@ -1430,12 +1777,12 @@ int main(int argc, char* argv[])
 
     SDL_SetTextureScaleMode(
         bikeTexture,
-        SDL_SCALEMODE_NEAREST
+        SDL_SCALEMODE_LINEAR
     );
 
     SDL_SetTextureScaleMode(
         wheelTexture,
-        SDL_SCALEMODE_NEAREST
+        SDL_SCALEMODE_LINEAR
     );
 
 
@@ -1573,6 +1920,7 @@ int main(int argc, char* argv[])
     char stuntText[64] = "";
     float stuntTextTimer = 0.0f;
     int score = 0;
+    int checkpointScore = 0;
 
     b2Vec2 respawnPosition =
         b2Vec2{ 0.0f, -7.0f };
@@ -1636,7 +1984,6 @@ int main(int argc, char* argv[])
 
         if (input.resetPressed)
         {
-
             if (levelComplete)
             {
                 checkpointReached = false;
@@ -1645,6 +1992,10 @@ int main(int argc, char* argv[])
                     b2Vec2{ 0.0f, -7.0f };
 
                 levelTime = 0.0f;
+
+                // Full new run.
+                score = 0;
+                checkpointScore = 0;
             }
 
             ResetBike(
@@ -1655,11 +2006,22 @@ int main(int argc, char* argv[])
             cameraX = respawnPosition.x;
 
             bikeGrounded = true;
-
             levelComplete = false;
 
+            // Restore score from last checkpoint.
+            score = checkpointScore;
+
+            // Clear stunt state.
             airTime = 0.0f;
             wasBikeGrounded = true;
+
+            accumulatedRotation = 0.0f;
+
+            positiveFlipCompleted = false;
+            negativeFlipCompleted = false;
+
+            stuntText[0] = '\0';
+            stuntTextTimer = 0.0f;
         }
 
 
@@ -1963,7 +2325,9 @@ int main(int argc, char* argv[])
             checkpointReached = true;
 
             respawnPosition =
-                b2Vec2{ CHECKPOINT_X, -7.0f };
+                b2Vec2{ CHECKPOINT_X, -1.5f };
+
+            checkpointScore = score;
         }
 
         // Camera gradually catches up to the bike.
