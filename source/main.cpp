@@ -9,6 +9,7 @@
 #include "Terrain.h"
 #include <algorithm>
 #include <cmath>
+#include "ParticleSystem.h"
 
 // ---------------------------------------------------------
 // CONSTANTS
@@ -1207,7 +1208,8 @@ void Render(
     float bestTime,
     bool newBestTime,
     float boostMeter,
-    bool boostActive)
+    bool boostActive,
+    const ParticleSystem& particleSystem)
 
 {
     // =====================================================
@@ -1840,6 +1842,16 @@ void Render(
     );
 
     // =====================================================
+    // PARTICLE EFFECTS
+    // =====================================================
+
+    particleSystem.Render(
+        renderer,
+        cameraX
+    );
+
+
+    // =====================================================
  // BIKE VISUALS
  // Chassis follows chassis physics.
  // Wheels follow wheel physics independently.
@@ -2433,6 +2445,8 @@ int main(int argc, char* argv[])
     bool negativeFlipCompleted = false;
     int flipCount = 0;
 
+    ParticleSystem particleSystem;
+
     // No best time exists yet so -1
     float bestTime = -1.0f;
     bool newBestTime = false;
@@ -2552,6 +2566,8 @@ int main(int argc, char* argv[])
 
             stuntText[0] = '\0';
             stuntTextTimer = 0.0f;
+
+            particleSystem.Clear();
         }
 
 
@@ -2703,6 +2719,14 @@ int main(int argc, char* argv[])
 
                     wheelieAwarded = true;
 
+                    b2Vec2 rearWheelPosition =
+                        b2Body_GetPosition(
+                            bike.rearWheelBodyId
+                        );
+
+                    particleSystem.SpawnWheelieDust(
+                        rearWheelPosition
+                    );
 
                     SDL_snprintf(
                         stuntText,
@@ -2815,13 +2839,22 @@ int main(int argc, char* argv[])
             {
                 boostActive = true;
                 UpdateBikeControls(
-    bike,
-    input,
-    bikeGrounded,
-    levelComplete,
-    boostActive
+                bike,
+                input,
+                bikeGrounded,
+                levelComplete,
+                boostActive
 );
                 boostMeter = MAX_BOOST;
+
+                b2Vec2 rearWheelPosition =
+                    b2Body_GetPosition(
+                        bike.rearWheelBodyId
+                    );
+
+                particleSystem.SpawnBoostBurst(
+                    rearWheelPosition
+                );
 
                 SDL_snprintf(
                     stuntText,
@@ -3036,6 +3069,16 @@ int main(int argc, char* argv[])
                 terrain.groundBodyId
             );
 
+        // =================================================
+        // PARTICLE SYSTEM
+        // =================================================
+
+        particleSystem.Update(
+            deltaTime,
+            boostActive,
+            rearWheelPosition
+        );
+
 
         // =================================================
         // REAR WHEEL -> SDL
@@ -3128,7 +3171,8 @@ int main(int argc, char* argv[])
             bestTime,
             newBestTime,
             boostMeter,
-            boostActive
+            boostActive,
+            particleSystem
         );
     }
 
