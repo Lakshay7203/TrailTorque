@@ -1477,16 +1477,28 @@ void Render(
     );
 
     // =====================================================
-    // NEW BIKE VISUALS
-    // =====================================================
+ // BIKE VISUALS
+ // Chassis follows chassis physics.
+ // Wheels follow wheel physics independently.
+ // =====================================================
+
+ // -----------------------------------------------------
+ // CHASSIS PHYSICS POSITION + ROTATION
+ // -----------------------------------------------------
 
     b2Vec2 chassisPosition =
         b2Body_GetPosition(chassisBodyId);
 
-    float chassisAngle =
+    float chassisAngleRadians =
         b2Rot_GetAngle(
             b2Body_GetRotation(chassisBodyId)
         );
+
+    constexpr float RAD_TO_DEG =
+        57.2957795f;
+
+
+    // Convert chassis Box2D position -> SDL screen position.
 
     float chassisScreenX =
         CAMERA_TARGET_X +
@@ -1498,114 +1510,209 @@ void Render(
         chassisPosition.y *
         PIXELS_PER_METER;
 
-    const float BIKE_VISUAL_OFFSET_Y = 18.0f;
-
-    float visualChassisScreenY =
-        chassisScreenY + BIKE_VISUAL_OFFSET_Y;
-
 
     // =====================================================
-// RIDER + FRAME - ALIGN TO REAL WHEEL CENTERS
-// =====================================================
+    // RIDER + FRAME
+    // =====================================================
 
+    // Dimensions of rider_chassis.png.
     constexpr float ART_WIDTH = 1448.0f;
     constexpr float ART_HEIGHT = 1086.0f;
 
-    // Axle-hole centers in rider_chassis.png.
+
+    // Axle positions inside rider_chassis.png.
     constexpr float REAR_AXLE_X = 249.0f;
     constexpr float REAR_AXLE_Y = 889.0f;
 
     constexpr float FRONT_AXLE_X = 1208.0f;
     constexpr float FRONT_AXLE_Y = 946.0f;
 
-    constexpr float RAD_TO_DEG = 57.2957795f;
 
+    // -----------------------------------------------------
+    // AXLE LINE INSIDE THE ARTWORK
+    // -----------------------------------------------------
 
-    // Distance/angle between axle holes in the PNG.
     float artDX =
-        FRONT_AXLE_X - REAR_AXLE_X;
+        FRONT_AXLE_X -
+        REAR_AXLE_X;
 
     float artDY =
-        FRONT_AXLE_Y - REAR_AXLE_Y;
+        FRONT_AXLE_Y -
+        REAR_AXLE_Y;
 
-    float artDistance =
+
+    float artAxleDistance =
         std::sqrt(
             artDX * artDX +
             artDY * artDY
         );
 
-    float artAngle =
+
+    float artAxleAngleDegrees =
         std::atan2(
             artDY,
             artDX
         ) * RAD_TO_DEG;
 
 
-    // Distance/angle between REAL Box2D wheels.
-    float screenDX =
-        frontWheelScreen.x -
-        rearWheelScreen.x;
+    // -----------------------------------------------------
+    // FIXED ART SCALE
+    // -----------------------------------------------------
 
-    float screenDY =
-        frontWheelScreen.y -
-        rearWheelScreen.y;
+    // In Bike.cpp:
+    //
+    // rear chassis anchor  = -0.8
+    // front chassis anchor = +0.8
+    //
+    // Distance between them = 1.6 Box2D meters.
 
-    float screenDistance =
-        std::sqrt(
-            screenDX * screenDX +
-            screenDY * screenDY
-        );
-
-    float screenAngle =
-        std::atan2(
-            screenDY,
-            screenDX
-        ) * RAD_TO_DEG;
+    constexpr float PHYSICS_AXLE_DISTANCE =
+        1.6f;
 
 
-    // Scale body so axle-hole distance matches physics wheel distance.
+    // Convert the physical 1.6 meter wheelbase into pixels,
+    // then determine how much the PNG should be scaled.
+
     float bikeScale =
-        screenDistance /
-        artDistance;
+        (PHYSICS_AXLE_DISTANCE *
+            PIXELS_PER_METER)
+        /
+        artAxleDistance;
 
 
-    // Size of rendered rider/body.
-    SDL_FRect bikeRect;
+    // -----------------------------------------------------
+    // FIND THE CHASSIS CENTER INSIDE THE PNG
+    // -----------------------------------------------------
 
-    bikeRect.w =
-        ART_WIDTH * bikeScale;
+    // Midpoint between artwork axle holes.
 
-    constexpr float RIDER_HEIGHT_SCALE = 1.2f;
+    float artAxleMidX =
+        (REAR_AXLE_X +
+            FRONT_AXLE_X)
+        / 2.0f;
 
-    bikeRect.h =
-        ART_HEIGHT *
-        bikeScale *
-        RIDER_HEIGHT_SCALE;
+    float artAxleMidY =
+        (REAR_AXLE_Y +
+            FRONT_AXLE_Y)
+        / 2.0f;
 
 
-    // Use REAR axle hole as the rotation pivot.
-    SDL_FPoint bikePivot =
+    // Direction of axle line.
+
+    float artDirectionX =
+        artDX /
+        artAxleDistance;
+
+    float artDirectionY =
+        artDY /
+        artAxleDistance;
+
+
+    // Perpendicular direction pointing upward
+    // in PNG coordinates.
+    //
+    // PNG Y increases downward.
+
+    float artUpX =
+        artDirectionY;
+
+    float artUpY =
+        -artDirectionX;
+
+
+    // In Bike.cpp the wheel-joint chassis anchors
+    // are 0.65 meters below the chassis center.
+
+    constexpr float CHASSIS_TO_AXLE_DISTANCE =
+        0.65f;
+
+
+    // Convert that physical distance back into
+    // unscaled artwork pixels.
+
+    float chassisOffsetInArt =
+        (CHASSIS_TO_AXLE_DISTANCE *
+            PIXELS_PER_METER)
+        /
+        bikeScale;
+
+
+    // This is approximately where the Box2D chassis center
+    // lives inside rider_chassis.png.
+
+    float chassisArtX =
+        artAxleMidX +
+        artUpX *
+        chassisOffsetInArt;
+
+    float chassisArtY =
+        artAxleMidY +
+        artUpY *
+        chassisOffsetInArt;
+
+
+    // -----------------------------------------------------
+    // RIDER / FRAME RECTANGLE
+    // -----------------------------------------------------
+
+    SDL_FRect bikeRect =
     {
-        REAR_AXLE_X * bikeScale,
-        REAR_AXLE_Y * bikeScale
+        0.0f,
+        0.0f,
+
+        ART_WIDTH *
+        bikeScale,
+
+        ART_HEIGHT *
+        bikeScale
     };
 
 
-    // Put rear axle hole EXACTLY on rear Box2D wheel center.
+    // The rotation pivot is now the REAL chassis center,
+    // not one of the wheels.
+
+    SDL_FPoint bikePivot =
+    {
+        chassisArtX *
+        bikeScale,
+
+        chassisArtY *
+        bikeScale
+    };
+
+
+    // Put that chassis point directly over the
+    // Box2D chassis body's screen position.
+
     bikeRect.x =
-        rearWheelScreen.x -
+        chassisScreenX -
         bikePivot.x;
 
     bikeRect.y =
-        rearWheelScreen.y -
+        chassisScreenY -
         bikePivot.y;
 
 
-    // Rotate artwork so front axle also lands on front wheel.
-    float bikeVisualAngle =
-        screenAngle -
-        artAngle;
+    // -----------------------------------------------------
+    // CHASSIS ROTATION
+    // -----------------------------------------------------
 
+    // Box2D positive rotation is counter-clockwise.
+    //
+    // SDL screen Y points downward, so visually we use
+    // the negative Box2D angle.
+    //
+    // artAxleAngleDegrees removes the small built-in
+    // axle angle from the PNG itself.
+
+    float bikeVisualAngle =
+        -chassisAngleRadians *
+        RAD_TO_DEG
+        -
+        artAxleAngleDegrees;
+
+
+    // Draw rider + motorcycle frame.
 
     SDL_RenderTextureRotated(
         renderer,
@@ -1618,59 +1725,103 @@ void Render(
     );
 
 
-    // ------------------------------
+    // =====================================================
     // WHEELS
-    // ------------------------------
+    // =====================================================
 
-    const float wheelSize = 50.0f;
+    // Physical wheel diameter:
+    //
+    // radius 0.4 m
+    // diameter 0.8 m.
+    //
+    // Extra scale compensates for transparent padding
+    // around the wheel PNG.
 
-    const float rearWheelOffsetX = -3.0f;
-    const float frontWheelOffsetX = 4.0f;
+    constexpr float WHEEL_VISUAL_SCALE =
+        1.55f;
 
-    const float wheelOffsetY = -2.0f;
+    float wheelSize =
+        BIKE_WHEEL_RADIUS *
+        2.0f *
+        PIXELS_PER_METER *
+        WHEEL_VISUAL_SCALE;
+
+
+    // -----------------------------------------------------
+    // REAR WHEEL
+    // -----------------------------------------------------
 
     SDL_FRect rearWheelRect =
     {
-        rearWheelScreen.x - wheelSize / 2.0f,
-        rearWheelScreen.y - wheelSize / 2.0f,
+        rearWheelScreen.x -
+        wheelSize / 2.0f,
+
+        rearWheelScreen.y -
+        wheelSize / 2.0f,
+
         wheelSize,
         wheelSize
     };
+
+
+    // -----------------------------------------------------
+    // FRONT WHEEL
+    // -----------------------------------------------------
 
     SDL_FRect frontWheelRect =
     {
-        frontWheelScreen.x - wheelSize / 2.0f,
-        frontWheelScreen.y - wheelSize / 2.0f,
+        frontWheelScreen.x -
+        wheelSize / 2.0f,
+
+        frontWheelScreen.y -
+        wheelSize / 2.0f,
+
         wheelSize,
         wheelSize
     };
 
-    float rearAngle =
-        -b2Rot_GetAngle(
-            b2Body_GetRotation(rearWheelBodyId)
-        ) * 57.2957795f;
 
-    float frontAngle =
+    // -----------------------------------------------------
+    // WHEEL ROTATION
+    // -----------------------------------------------------
+
+    float rearWheelAngle =
         -b2Rot_GetAngle(
-            b2Body_GetRotation(frontWheelBodyId)
-        ) * 57.2957795f;
+            b2Body_GetRotation(
+                rearWheelBodyId
+            )
+        ) * RAD_TO_DEG;
+
+
+    float frontWheelAngle =
+        -b2Rot_GetAngle(
+            b2Body_GetRotation(
+                frontWheelBodyId
+            )
+        ) * RAD_TO_DEG;
+
+
+    // -----------------------------------------------------
+    // DRAW WHEELS
+    // -----------------------------------------------------
 
     SDL_RenderTextureRotated(
         renderer,
         wheelTexture,
         nullptr,
         &rearWheelRect,
-        rearAngle,
+        rearWheelAngle,
         nullptr,
         SDL_FLIP_NONE
     );
+
 
     SDL_RenderTextureRotated(
         renderer,
         wheelTexture,
         nullptr,
         &frontWheelRect,
-        frontAngle,
+        frontWheelAngle,
         nullptr,
         SDL_FLIP_NONE
     );
@@ -1907,6 +2058,9 @@ int main(int argc, char* argv[])
     float airTime = 0.0f;
     bool wasBikeGrounded = true;
 
+    float wheelieTime = 0.0f;
+    bool wheelieAwarded = false;
+
     float previousBikeAngle = 0.0f;
     float accumulatedRotation = 0.0f;
 
@@ -2105,6 +2259,89 @@ int main(int argc, char* argv[])
 
             bikeGrounded =
                 IsBikeGrounded(bike);
+
+            // ---------------------------------------------
+// WHEELIE DETECTION
+// ---------------------------------------------
+
+            bool rearWheelGrounded =
+                IsRearWheelGrounded(bike);
+
+            bool frontWheelGrounded =
+                IsFrontWheelGrounded(bike);
+
+
+            b2Vec2 chassisVelocity =
+                b2Body_GetLinearVelocity(
+                    bike.chassisBodyId
+                );
+
+
+            float currentChassisAngle =
+                b2Rot_GetAngle(
+                    b2Body_GetRotation(
+                        bike.chassisBodyId
+                    )
+                );
+
+
+            const float minimumWheelieSpeed =
+                1.5f;
+
+            const float minimumWheelieAngle =
+                0.25f;
+
+
+            bool doingWheelie =
+                rearWheelGrounded &&
+                !frontWheelGrounded &&
+                chassisVelocity.x >
+                minimumWheelieSpeed &&
+                currentChassisAngle >
+                minimumWheelieAngle &&
+                !levelComplete;
+
+
+            if (doingWheelie)
+            {
+                wheelieTime +=
+                    physicsTimeStep;
+
+
+                constexpr float WHEELIE_SCORE_TIME =
+                    1.00f;
+
+
+                if (wheelieTime >= WHEELIE_SCORE_TIME &&
+                    !wheelieAwarded)
+                {
+                    score += 250;
+
+                    wheelieAwarded = true;
+
+
+                    SDL_snprintf(
+                        stuntText,
+                        sizeof(stuntText),
+                        "WHEELIE! +250"
+                    );
+
+                    stuntTextTimer =
+                        1.2f;
+
+
+                    SDL_Log(
+                        "WHEELIE | Time: %.2f | Score: %d",
+                        wheelieTime,
+                        score
+                    );
+                }
+            }
+            else
+            {
+                wheelieTime = 0.0f;
+                wheelieAwarded = false;
+            }
 
             bool justLeftGround =
                 wasBikeGrounded &&
