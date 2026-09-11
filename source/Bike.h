@@ -37,7 +37,8 @@ void UpdateBikeControls(
     const Bike& bike,
     const InputState& input,
     bool bikeGrounded,
-    bool levelComplete
+    bool levelComplete,
+    bool boostActive
 );
 
 void LimitBikeAngularSpeed(

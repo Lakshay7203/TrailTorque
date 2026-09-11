@@ -360,8 +360,14 @@ void DrawUI(
     float stuntTextTimer,
     int score,
     float bestTime,
-    bool newBestTime)
+    bool newBestTime,
+    float boostMeter,
+    bool boostActive)
 {
+    // =====================================================
+    // TEXT DATA
+    // =====================================================
+
     char timerText[64];
 
     int minutes =
@@ -374,28 +380,63 @@ void DrawUI(
     SDL_snprintf(
         timerText,
         sizeof(timerText),
-        "Time: %02d:%05.2f",
+        "TIME  %02d:%05.2f",
         minutes,
         seconds
     );
 
-    char airTimeText[64];
-
-    SDL_snprintf(
-        airTimeText,
-        sizeof(airTimeText),
-        "Air Time: %.2f",
-        airTime
-    );
 
     char scoreText[64];
 
     SDL_snprintf(
         scoreText,
         sizeof(scoreText),
-        "Score: %d",
+        "SCORE  %d",
         score
     );
+
+
+    char airTimeText[64];
+
+    SDL_snprintf(
+        airTimeText,
+        sizeof(airTimeText),
+        "AIR  %.2fs",
+        airTime
+    );
+
+
+    // Keep boost percentage safe between 0 and 100.
+
+    float displayBoost =
+        boostMeter;
+
+    if (displayBoost < 0.0f)
+    {
+        displayBoost = 0.0f;
+    }
+
+    if (displayBoost > 100.0f)
+    {
+        displayBoost = 100.0f;
+    }
+
+
+    char boostText[64];
+
+    SDL_snprintf(
+        boostText,
+        sizeof(boostText),
+        boostActive
+        ? "BOOST ACTIVE!  %d%%"
+        : "BOOST  %d%%",
+        static_cast<int>(displayBoost)
+    );
+
+
+    // =====================================================
+    // COLORS
+    // =====================================================
 
     SDL_Color white =
     {
@@ -406,86 +447,393 @@ void DrawUI(
     };
 
 
+    // =====================================================
+    // NORMAL GAME HUD
+    // =====================================================
+
     if (!levelComplete)
     {
-        DrawText(
+        // Enable transparency for HUD panels.
+
+        SDL_SetRenderDrawBlendMode(
             renderer,
-            font,
-            "W/S - Drive",
-            25.0f,
-            25.0f,
-            white
+            SDL_BLENDMODE_BLEND
         );
+
+
+        // =================================================
+        // LEFT CONTROL PANEL
+        // =================================================
+
+        SDL_FRect controlsPanel =
+        {
+            15.0f,
+            15.0f,
+            200.0f,
+            145.0f
+        };
+
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            20,
+            30,
+            40,
+            150
+        );
+
+        SDL_RenderFillRect(
+            renderer,
+            &controlsPanel
+        );
+
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            255,
+            255,
+            255,
+            80
+        );
+
+        SDL_RenderRect(
+            renderer,
+            &controlsPanel
+        );
+
 
         DrawText(
             renderer,
             font,
-            "A/D - Lean",
-            25.0f,
-            55.0f,
+            "W/S  DRIVE",
+            30.0f,
+            28.0f,
             white
         );
+
 
         DrawText(
             renderer,
             font,
-            "R - Reset",
-            25.0f,
-            85.0f,
+            "A/D  LEAN",
+            30.0f,
+            58.0f,
             white
         );
+
+
+        DrawText(
+            renderer,
+            font,
+            "SPACE  HOP",
+            30.0f,
+            88.0f,
+            white
+        );
+
+
+        DrawText(
+            renderer,
+            font,
+            "R  RESET",
+            30.0f,
+            118.0f,
+            white
+        );
+
+
+        // =================================================
+        // RIGHT HUD PANEL
+        // =================================================
+
+        constexpr float hudPanelWidth =
+            300.0f;
+
+        constexpr float hudPanelHeight =
+            165.0f;
+
+        constexpr float hudPanelX =
+            SCREEN_WIDTH -
+            hudPanelWidth -
+            20.0f;
+
+        constexpr float hudPanelY =
+            15.0f;
+
+
+        SDL_FRect hudPanel =
+        {
+            hudPanelX,
+            hudPanelY,
+            hudPanelWidth,
+            hudPanelHeight
+        };
+
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            20,
+            30,
+            40,
+            165
+        );
+
+        SDL_RenderFillRect(
+            renderer,
+            &hudPanel
+        );
+
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            255,
+            255,
+            255,
+            80
+        );
+
+        SDL_RenderRect(
+            renderer,
+            &hudPanel
+        );
+
+
+        // -------------------------------------------------
+        // TIME
+        // -------------------------------------------------
 
         DrawText(
             renderer,
             font,
             timerText,
-            SCREEN_WIDTH - 180.0f,
-            25.0f,
+            hudPanelX + 20.0f,
+            hudPanelY + 15.0f,
             white
         );
+
+
+        // -------------------------------------------------
+        // SCORE
+        // -------------------------------------------------
 
         DrawText(
             renderer,
             font,
             scoreText,
-            SCREEN_WIDTH - 180.0f,
-            55.0f,
+            hudPanelX + 20.0f,
+            hudPanelY + 48.0f,
             white
         );
+
+
+        // -------------------------------------------------
+        // BOOST LABEL
+        // -------------------------------------------------
+
+        DrawText(
+            renderer,
+            font,
+            boostText,
+            hudPanelX + 20.0f,
+            hudPanelY + 82.0f,
+            white
+        );
+
+
+        // =================================================
+        // BOOST BAR
+        // =================================================
+
+        constexpr float boostBarHeight =
+            22.0f;
+
+        const float boostBarX =
+            hudPanelX + 20.0f;
+
+        const float boostBarY =
+            hudPanelY + 120.0f;
+
+        const float boostBarWidth =
+            hudPanelWidth - 40.0f;
+
+
+        // Background.
+
+        SDL_FRect boostBackground =
+        {
+            boostBarX,
+            boostBarY,
+            boostBarWidth,
+            boostBarHeight
+        };
+
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            35,
+            35,
+            35,
+            255
+        );
+
+        SDL_RenderFillRect(
+            renderer,
+            &boostBackground
+        );
+
+
+        // Calculate 0.0 -> 1.0.
+
+        float boostPercent =
+            displayBoost /
+            100.0f;
+
+
+        SDL_FRect boostFill =
+        {
+            boostBarX,
+            boostBarY,
+            boostBarWidth *
+                boostPercent,
+            boostBarHeight
+        };
+
+
+        // Different visual when boost is active.
+
+        if (boostActive)
+        {
+            SDL_SetRenderDrawColor(
+                renderer,
+                255,
+                210,
+                40,
+                255
+            );
+        }
+        else
+        {
+            SDL_SetRenderDrawColor(
+                renderer,
+                255,
+                165,
+                30,
+                255
+            );
+        }
+
+
+        SDL_RenderFillRect(
+            renderer,
+            &boostFill
+        );
+
+
+        // Border.
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            255,
+            255,
+            255,
+            255
+        );
+
+        SDL_RenderRect(
+            renderer,
+            &boostBackground
+        );
+
+
+        // =================================================
+        // AIR TIME
+        // =================================================
 
         if (airTime > 0.0f)
         {
             DrawText(
                 renderer,
-                font,
+                stuntFont,
                 airTimeText,
-                SCREEN_WIDTH / 2.0f - 80.0f,
-                40.0f,
+                SCREEN_WIDTH / 2.0f - 70.0f,
+                35.0f,
                 white
             );
         }
-        
     }
+
+
+    // =====================================================
+    // LEVEL COMPLETE SCREEN
+    // =====================================================
+
     else
     {
+        SDL_SetRenderDrawBlendMode(
+            renderer,
+            SDL_BLENDMODE_BLEND
+        );
+
+
+        SDL_FRect completePanel =
+        {
+            SCREEN_WIDTH / 2.0f - 220.0f,
+            55.0f,
+            440.0f,
+            250.0f
+        };
+
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            20,
+            30,
+            40,
+            190
+        );
+
+        SDL_RenderFillRect(
+            renderer,
+            &completePanel
+        );
+
+
+        SDL_SetRenderDrawColor(
+            renderer,
+            255,
+            255,
+            255,
+            100
+        );
+
+        SDL_RenderRect(
+            renderer,
+            &completePanel
+        );
+
+
         DrawText(
             renderer,
-            font,
+            stuntFont,
             "LEVEL COMPLETE!",
-            SCREEN_WIDTH / 2.0f - 110.0f,
+            SCREEN_WIDTH / 2.0f - 135.0f,
             80.0f,
             white
         );
 
+
         char finishTimeText[64];
         char bestTimeText[64];
+
 
         int finishMinutes =
             static_cast<int>(levelTime) / 60;
 
         float finishSeconds =
             levelTime -
-            static_cast<float>(finishMinutes * 60);
+            static_cast<float>(
+                finishMinutes * 60
+                );
 
 
         int bestMinutes =
@@ -493,64 +841,76 @@ void DrawUI(
 
         float bestSeconds =
             bestTime -
-            static_cast<float>(bestMinutes * 60);
+            static_cast<float>(
+                bestMinutes * 60
+                );
 
 
         SDL_snprintf(
             finishTimeText,
             sizeof(finishTimeText),
-            "Finish Time: %02d:%05.2f",
+            "FINISH  %02d:%05.2f",
             finishMinutes,
             finishSeconds
         );
 
+
         SDL_snprintf(
             bestTimeText,
             sizeof(bestTimeText),
-            "Best Time: %02d:%05.2f",
+            "BEST    %02d:%05.2f",
             bestMinutes,
             bestSeconds
         );
+
 
         DrawText(
             renderer,
             font,
             finishTimeText,
-            SCREEN_WIDTH / 2.0f - 105.0f,
-            130.0f,
+            SCREEN_WIDTH / 2.0f - 115.0f,
+            145.0f,
             white
         );
+
 
         DrawText(
             renderer,
             font,
             bestTimeText,
-            SCREEN_WIDTH / 2.0f - 105.0f,
-            170.0f,
+            SCREEN_WIDTH / 2.0f - 115.0f,
+            180.0f,
             white
         );
+
 
         if (newBestTime)
         {
             DrawText(
                 renderer,
-                font,
+                stuntFont,
                 "NEW BEST!",
-                SCREEN_WIDTH / 2.0f - 70.0f,
-                210.0f,
+                SCREEN_WIDTH / 2.0f - 80.0f,
+                215.0f,
                 white
             );
         }
 
+
         DrawText(
             renderer,
             font,
-            "Press R to restart",
-            SCREEN_WIDTH / 2.0f - 105.0f,
-            260.0f,
+            "R - RESTART",
+            SCREEN_WIDTH / 2.0f - 85.0f,
+            265.0f,
             white
         );
     }
+
+
+    // =====================================================
+    // STUNT POPUP
+    // =====================================================
 
     if (stuntTextTimer > 0.0f)
     {
@@ -558,8 +918,8 @@ void DrawUI(
             renderer,
             stuntFont,
             stuntText,
-            SCREEN_WIDTH / 2.0f - 100.0f,
-            80.0f,
+            SCREEN_WIDTH / 2.0f - 110.0f,
+            105.0f,
             white
         );
     }
@@ -845,7 +1205,10 @@ void Render(
     float stuntTextTimer,
     int score,
     float bestTime,
-    bool newBestTime)
+    bool newBestTime,
+    float boostMeter,
+    bool boostActive)
+
 {
     // =====================================================
     // SKY
@@ -1842,7 +2205,9 @@ void Render(
         stuntTextTimer,
         score,
         bestTime,
-        newBestTime
+        newBestTime,
+        boostMeter,
+        boostActive
     );
 
     // =====================================================
@@ -2081,6 +2446,16 @@ int main(int argc, char* argv[])
         b2Vec2{ 0.0f, -7.0f };
 
     // =====================================================
+    // BOOST SYSTEM
+    // =====================================================
+
+    float boostMeter = 0.0f;
+    bool boostActive = false;
+
+    constexpr float MAX_BOOST = 100.0f;
+    constexpr float BOOST_DRAIN_RATE = 20.0f;
+
+    // =====================================================
     // MAIN GAME LOOP
     // =====================================================
 
@@ -2192,7 +2567,8 @@ int main(int argc, char* argv[])
                 bike,
                 input,
                 bikeGrounded,
-                levelComplete
+                levelComplete,
+                boostActive
             );
 
             // ---------------------------------------------
@@ -2317,6 +2693,14 @@ int main(int argc, char* argv[])
                 {
                     score += 250;
 
+                    // Wheelie contributes 25% of the boost meter.
+                    boostMeter += 25.0f;
+
+                    if (boostMeter > MAX_BOOST)
+                    {
+                        boostMeter = MAX_BOOST;
+                    }
+
                     wheelieAwarded = true;
 
 
@@ -2421,6 +2805,50 @@ int main(int argc, char* argv[])
                 previousBikeAngle =
                     currentBikeAngle;
             }
+
+            // ---------------------------------------------
+            // BOOST ACTIVATION / DRAIN
+            // ---------------------------------------------
+
+            if (!boostActive &&
+                boostMeter >= MAX_BOOST)
+            {
+                boostActive = true;
+                UpdateBikeControls(
+    bike,
+    input,
+    bikeGrounded,
+    levelComplete,
+    boostActive
+);
+                boostMeter = MAX_BOOST;
+
+                SDL_snprintf(
+                    stuntText,
+                    sizeof(stuntText),
+                    "BOOST!"
+                );
+
+                stuntTextTimer = 1.2f;
+
+                SDL_Log("BOOST ACTIVATED");
+            }
+
+
+            if (boostActive)
+            {
+                boostMeter -=
+                    BOOST_DRAIN_RATE *
+                    physicsTimeStep;
+
+                if (boostMeter <= 0.0f)
+                {
+                    boostMeter = 0.0f;
+                    boostActive = false;
+
+                    SDL_Log("BOOST ENDED");
+                }
+            }
             // ---------------------------------------------
             // AIR TIME
             // ---------------------------------------------
@@ -2455,6 +2883,13 @@ int main(int argc, char* argv[])
                     {
                         score += 500;
 
+                        boostMeter += 50.0f;
+
+                        if (boostMeter > MAX_BOOST)
+                        {
+                            boostMeter = MAX_BOOST;
+                        }
+
                         SDL_Log(
                             "FRONT FLIP DETECTED | SCORE: %d",
                             score
@@ -2472,6 +2907,13 @@ int main(int argc, char* argv[])
                     if (negativeFlipCompleted)
                     {
                         score += 500;
+
+                        boostMeter += 50.0f;
+
+                        if (boostMeter > MAX_BOOST)
+                        {
+                            boostMeter = MAX_BOOST;
+                        }
 
                         SDL_Log(
                             "BACKFLIP DETECTED | SCORE: %d",
@@ -2684,7 +3126,9 @@ int main(int argc, char* argv[])
             stuntTextTimer,
             score,
             bestTime,
-            newBestTime
+            newBestTime,
+            boostMeter,
+            boostActive
         );
     }
 
