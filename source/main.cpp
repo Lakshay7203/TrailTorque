@@ -17,10 +17,11 @@
 constexpr float SCREEN_WIDTH = 1280.0f;
 constexpr float SCREEN_HEIGHT = 720.0f;
 
-constexpr float PIXELS_PER_METER = 30.0f;
+constexpr float PIXELS_PER_METER = 40.0f;
 
 constexpr float SCREEN_CENTER_X = SCREEN_WIDTH / 2.0f;
-constexpr float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0f;
+//constexpr float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0f;
+constexpr float SCREEN_CENTER_Y = 300.0f;
 
 constexpr float CAMERA_TARGET_X = 400.0f;
 
