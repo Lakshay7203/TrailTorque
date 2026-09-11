@@ -380,24 +380,46 @@ void UpdateBikeControls(
     const Bike& bike,
     const InputState& input,
     bool bikeGrounded,
-    bool levelComplete)
+    bool levelComplete,
+    bool boostActive)
 {
     // ---------------------------------------------
-    // DRIVE
-    // ---------------------------------------------
+// DRIVE
+// ---------------------------------------------
 
-    if (!levelComplete && input.driveForward)
+    const float normalMotorSpeed =
+        20.0f;
+
+    const float boostedMotorSpeed =
+        30.0f;
+
+
+    float currentMotorSpeed;
+
+    if (boostActive)
+    {
+        currentMotorSpeed = boostedMotorSpeed;
+    }
+    else
+    {
+        currentMotorSpeed = normalMotorSpeed;
+    }
+
+
+    if (!levelComplete &&
+        input.driveForward)
     {
         b2WheelJoint_SetMotorSpeed(
             bike.rearWheelJointId,
-            -20.0f
+            -currentMotorSpeed
         );
     }
-    else if (!levelComplete && input.driveBackward)
+    else if (!levelComplete &&
+        input.driveBackward)
     {
         b2WheelJoint_SetMotorSpeed(
             bike.rearWheelJointId,
-            20.0f
+            currentMotorSpeed
         );
     }
     else
