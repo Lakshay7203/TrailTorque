@@ -30,6 +30,9 @@ void ResetBike(
 
 bool IsBikeGrounded(const Bike& bike);
 
+bool IsRearWheelGrounded(const Bike& bike);
+bool IsFrontWheelGrounded(const Bike& bike);
+
 void UpdateBikeControls(
     const Bike& bike,
     const InputState& input,

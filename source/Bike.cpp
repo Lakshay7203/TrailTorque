@@ -347,6 +347,35 @@ bool IsBikeGrounded(const Bike& bike)
         frontWheelGrounded;
 }
 
+bool IsRearWheelGrounded(const Bike& bike)
+{
+    b2ContactData contacts[4];
+
+    int contactCount =
+        b2Shape_GetContactData(
+            bike.rearWheelShapeId,
+            contacts,
+            4
+        );
+
+    return contactCount > 0;
+}
+
+
+bool IsFrontWheelGrounded(const Bike& bike)
+{
+    b2ContactData contacts[4];
+
+    int contactCount =
+        b2Shape_GetContactData(
+            bike.frontWheelShapeId,
+            contacts,
+            4
+        );
+
+    return contactCount > 0;
+}
+
 void UpdateBikeControls(
     const Bike& bike,
     const InputState& input,
